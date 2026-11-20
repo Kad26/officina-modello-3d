@@ -1,0 +1,455 @@
+//! Components (define once, place many), visibility (hide, tags) and the
+//! flattened "what's actually visible" view every renderer and exporter uses.
+
+use crate::geom;
+use crate::model::{Definition, Face, FaceUv, Group, Id, Instance, Model};
+use anyhow::{anyhow, bail, Result};
+use glam::{DMat4, DVec3};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::Arc;
+
+/// A visible face in world space. `owner` is the face id for loose/grouped
+/// geometry, or the top-level component instance it came from.
+pub struct WFace {
+    pub owner: Id,
+    /// Top-level group of the face (None inside components).
+    pub group: Option<Id>,
+    pub face: Option<Id>,
+    /// Exact component placement path and face in the leaf definition's ID space.
+    pub paint_source: Option<(Arc<[Id]>, Id)>,
+    pub outer: Vec<DVec3>,
+    pub holes: Vec<Vec<DVec3>>,
+    pub normal: DVec3,
+    pub color: Option<[f32; 3]>,
+    /// material name (look it up in the model, or the component that owns it)
+    pub material: Option<String>,
+    pub uv: Option<FaceUv>,
+}
+
+pub struct WEdge {
+    pub owner: Id,
+    pub a: DVec3,
+    pub b: DVec3,
+    pub soft: bool,
+}
+
+#[derive(Clone, Copy)]
+struct InheritedPaint<'a> {
+    name: Option<&'a str>,
+    color: [f32; 3],
+}
+
+impl Model {
+    pub(crate) fn group_material(&self, group: Option<Id>) -> Option<&str> {
+        let mut at = group;
+        for _ in 0..self.groups.len() {
+            let g = self.groups.get(&at?)?;
+            if let Some(name) = g.material.as_deref() {
+                return Some(name);
+            }
+            at = g.parent;
+        }
+        None
+    }
+
+    pub fn tag_visible(&self, tag: &Option<String>) -> bool {
+        tag.as_ref().map_or(true, |t| self.tags.get(t).copied().unwrap_or(true))
+    }
+
+    pub(crate) fn group_visible(&self, g: Option<Id>) -> bool {
+        // hidden or tag-hidden anywhere up the chain hides it
+        self.ancestors(g).iter().all(|g| self.groups.get(g).map_or(true, |g| !g.hidden && self.tag_visible(&g.tag)))
+    }
+
+    /// Top-level placements of face-me components (flat figures), with the
+    /// way each faces now (radians in the ground plane, of its -y axis).
+    pub fn face_me_placements(&self) -> Vec<(Id, DVec3, f64)> {
+        self.instances
+            .iter()
+            .filter(|(_, i)| !i.hidden && self.definitions.get(&i.def).is_some_and(|d| d.face_me))
+            .map(|(id, i)| {
+                let f = i.transform.transform_vector3(DVec3::NEG_Y);
+                (*id, i.transform.w_axis.truncate(), f.y.atan2(f.x))
+            })
+            .collect()
+    }
+
+    /// A copy with every face-me figure turned to face `eye` (for renders).
+    /// None when there are none.
+    pub fn facing(&self, eye: DVec3) -> Option<Model> {
+        let figs = self.face_me_placements();
+        if figs.is_empty() {
+            return None;
+        }
+        let mut m = self.clone();
+        for (id, pivot, now) in figs {
+            let to = eye - pivot;
+            if to.x.hypot(to.y) < 1e-9 {
+                continue;
+            }
+            let turn = to.y.atan2(to.x) - now;
+            let r = DMat4::from_translation(pivot) * DMat4::from_rotation_z(turn) * DMat4::from_translation(-pivot);
+            if let Some(i) = m.instances.get_mut(&id) {
+                i.transform = r * i.transform;
+            }
+        }
+        Some(m)
+    }
+
+    pub fn world_faces(&self) -> Vec<WFace> {
+        let mut out = Vec::new();
+        self.collect_faces(self, DMat4::IDENTITY, &[], None, &Default::default(), &mut out);
+        out
+    }
+
+    pub(crate) fn placed_loop(&self, vertices: &[Id], t: DMat4, mirrored: bool) -> Vec<DVec3> {
+        let mut points: Vec<_> = vertices.iter().map(|id| t.transform_point3(self.p(*id))).collect();
+        // A reflection changes handedness, but preserves the front of the face.
+        if mirrored {
+            points.reverse();
+        }
+        points
+    }
+
+    /// A component's own size (its definition's bounds), for Dynamic
+    /// Component lengths.
+    fn def_size(root: &Model, def: &crate::model::Definition) -> DVec3 {
+        let mut fs = Vec::new();
+        def.model.collect_faces(root, DMat4::IDENTITY, &[0], None, &Default::default(), &mut fs);
+        let mut it = fs.iter().flat_map(|f| f.outer.iter());
+        let Some(first) = it.next() else { return DVec3::ZERO };
+        let (lo, hi) = it.fold((*first, *first), |(lo, hi), p| (lo.min(*p), hi.max(*p)));
+        hi - lo
+    }
+
+    /// How a placement draws (copies, stretch, fill, hidden), Dynamic
+    /// Component attributes worked out.
+    fn placement(root: &Model, inst: &crate::model::Instance, def: &crate::model::Definition, scope: &BTreeMap<String, f64>) -> crate::dynamic::Draw {
+        let has = !inst.attrs.is_empty() || !def.attrs.is_empty();
+        let size = if has { Self::def_size(root, def) } else { DVec3::ZERO };
+        crate::dynamic::draw(root, inst, Some(def), size, scope)
+    }
+
+    /// `root` holds the definitions: components inside components are looked
+    /// up there, not in the definition's own (empty) table.
+    fn collect_faces<'a>(&'a self, root: &'a Model, t: DMat4, path: &[Id], fill: Option<InheritedPaint<'a>>, scope: &BTreeMap<String, f64>, out: &mut Vec<WFace>) {
+        // a second line behind the checks at import, open and every command: a model that nests too deep, loops or
+        // expands to more than the limit still draws (what fits), it never overflows the stack or the memory
+        if path.len() > crate::nesting::MAX_NEST {
+            return;
+        }
+        let owner = path.first().copied();
+        let placement: Option<Arc<[Id]>> = owner.map(|_| Arc::from(path));
+        let mirrored = t.determinant() < 0.0;
+        let named_paint = |name: &'a str| {
+            self.materials.get(name).or_else(|| root.find_material(name))
+                .map(|m| InheritedPaint { name: Some(name), color: m.color })
+        };
+        for (&id, f) in &self.faces {
+            if out.len() >= crate::nesting::MAX_EXPANDED {
+                return;
+            }
+            if f.hidden || !self.group_visible(f.group) {
+                continue;
+            }
+            let tp = |vertices: &[Id]| self.placed_loop(vertices, t, mirrored);
+            let outer = tp(&f.outer);
+            let normal = geom::newell(&outer);
+            let paint = f.material.as_deref().and_then(named_paint)
+                .or_else(|| self.group_material(f.group).and_then(named_paint)).or(fill);
+            out.push(WFace {
+                owner: owner.unwrap_or(id),
+                group: if owner.is_none() { f.group } else { None },
+                face: owner.is_none().then_some(id),
+                paint_source: placement.as_ref().map(|p| (Arc::clone(p), id)),
+                holes: f.holes.iter().map(|h| tp(h)).collect(),
+                outer,
+                normal,
+                color: paint.map(|p| p.color),
+                material: f.material.clone().or_else(|| paint.and_then(|p| p.name).map(str::to_string)),
+                uv: f.uv.and_then(|uv| uv.transformed(t)),
+            });
+        }
+        for (&iid, inst) in &self.instances {
+            if inst.hidden || !self.tag_visible(&inst.tag) || !self.group_visible(inst.parent) {
+                continue;
+            }
+            if let Some(def) = root.definitions.get(&inst.def).or_else(|| self.definitions.get(&inst.def)) {
+                let d = Self::placement(root, inst, def, scope);
+                if d.hidden {
+                    continue;
+                }
+                let mut child_path = path.to_vec();
+                child_path.push(iid);
+                let child_fill = inst.material.as_deref().and_then(named_paint)
+                    .or_else(|| d.color.map(|color| InheritedPaint { name: None, color }))
+                    .or_else(|| self.group_material(inst.parent).and_then(named_paint))
+                    .or(fill);
+                for p in &d.placements {
+                    def.model.collect_faces(root, t * *p, &child_path, child_fill, &d.scope, out);
+                    if out.len() >= crate::nesting::MAX_EXPANDED {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn world_edges(&self) -> Vec<WEdge> {
+        let mut out = Vec::new();
+        self.collect_edges(self, DMat4::IDENTITY, None, &Default::default(), &mut out, 0);
+        out
+    }
+
+    fn collect_edges(&self, root: &Model, t: DMat4, owner: Option<Id>, scope: &BTreeMap<String, f64>, out: &mut Vec<WEdge>, depth: usize) {
+        if depth > crate::nesting::MAX_NEST {
+            return;
+        }
+        // an edge shows if it isn't hidden and something visible uses it (or it's a free line)
+        let mut used: HashMap<(Id, Id), bool> = HashMap::new();
+        for f in self.faces.values() {
+            let vis = !f.hidden && self.group_visible(f.group);
+            for l in f.loops() {
+                for (a, b) in crate::model::pairs(l) {
+                    let k = (a.min(b), a.max(b));
+                    let e = used.entry(k).or_insert(false);
+                    *e |= vis;
+                }
+            }
+        }
+        for (&id, e) in &self.edges {
+            if out.len() >= crate::nesting::MAX_EXPANDED {
+                return;
+            }
+            let k = (e.a.min(e.b), e.a.max(e.b));
+            let visible = used.get(&k).copied().unwrap_or(self.group_visible(e.group));
+            if e.hidden || !visible {
+                continue;
+            }
+            out.push(WEdge {
+                owner: owner.unwrap_or(id),
+                a: t.transform_point3(self.p(e.a)),
+                b: t.transform_point3(self.p(e.b)),
+                soft: e.soft,
+            });
+        }
+        for (&iid, inst) in &self.instances {
+            if inst.hidden || !self.tag_visible(&inst.tag) || !self.group_visible(inst.parent) {
+                continue;
+            }
+            if let Some(def) = root.definitions.get(&inst.def).or_else(|| self.definitions.get(&inst.def)) {
+                let d = Self::placement(root, inst, def, scope);
+                if d.hidden {
+                    continue;
+                }
+                for p in &d.placements {
+                    def.model.collect_edges(root, t * *p, Some(owner.unwrap_or(iid)), &d.scope, out, depth + 1);
+                    if out.len() >= crate::nesting::MAX_EXPANDED {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Bounds of everything, components included.
+    /// A material by name, here or in any component definition.
+    pub fn find_material(&self, name: &str) -> Option<&crate::model::Material> {
+        self.materials.get(name).or_else(|| self.definitions.values().find_map(|d| d.model.find_material(name)))
+    }
+
+    pub fn world_bounds(&self) -> Option<(DVec3, DVec3)> {
+        let mut it = self.world_faces().into_iter().flat_map(|f| f.outer).chain(self.world_edges().into_iter().flat_map(|e| [e.a, e.b]));
+        let first = it.next()?;
+        Some(it.fold((first, first), |(lo, hi), p| (lo.min(p), hi.max(p))))
+    }
+
+    // ----- components -------------------------------------------------------
+
+    /// Turn faces (or a group) into a component and put one instance where
+    /// they were. The component's origin is its bounding-box min corner.
+    pub fn make_component(&mut self, ids: &[Id], name: String) -> Result<Id> {
+        let faces = self.faces_of(ids)?;
+        if faces.is_empty() {
+            bail!("nothing to make a component from");
+        }
+        let verts: BTreeSet<Id> = faces.iter().flat_map(|f| self.faces[f].loops().flatten().copied().collect::<Vec<_>>()).collect();
+        let lo = verts.iter().map(|v| self.p(*v)).fold(DVec3::splat(f64::MAX), |a, p| a.min(p));
+        let mut def = Model::default();
+        let mut map: HashMap<Id, Id> = HashMap::new();
+        for v in &verts {
+            map.insert(*v, def.vertex_in(self.p(*v) - lo, None));
+        }
+        for f in &faces {
+            let face = &self.faces[f];
+            let outer = face.outer.iter().map(|v| map[v]).collect();
+            let holes = face.holes.iter().map(|h| h.iter().map(|v| map[v]).collect()).collect();
+            let material = face.material.clone().or_else(|| self.group_material(face.group).map(str::to_string));
+            if let Some(m) = &material {
+                if let Some(mat) = self.materials.get(m) {
+                    def.materials.insert(m.clone(), mat.clone());
+                }
+            }
+            let uv = face.uv.and_then(|uv| uv.transformed(DMat4::from_translation(-lo)));
+            def.insert_face(Face { outer, holes, material, uv, ..Default::default() });
+        }
+        // carry soft edges over
+        for e in self.edges.values() {
+            if e.soft {
+                if let (Some(&a), Some(&b)) = (map.get(&e.a), map.get(&e.b)) {
+                    if let Some(id) = def.find_edge(a, b) {
+                        def.edges.get_mut(&id).unwrap().soft = true;
+                    }
+                }
+            }
+        }
+        // remove the originals (and the group, if a whole group was converted)
+        for f in &faces {
+            self.faces.remove(f);
+        }
+        for id in ids {
+            if self.groups.contains_key(id) {
+                self.delete(&[*id])?;
+            }
+        }
+        self.edges.retain(|_, e| !(verts.contains(&e.a) && verts.contains(&e.b)) || self.faces.values().any(|f| f.uses_edge(e.a, e.b)));
+        self.gc();
+        let did = self.new_id();
+        self.definitions.insert(did, Definition { name: name.clone(), model: std::sync::Arc::new(def), attrs: Default::default(), source: None, cuts: false, face_me: false });
+        self.place(did, lo, 0.0, None)
+    }
+
+    pub fn find_definition(&self, key: &str) -> Option<Id> {
+        key.parse::<Id>().ok().filter(|id| self.definitions.contains_key(id)).or_else(|| {
+            self.definitions.iter().find(|(_, d)| d.name.eq_ignore_ascii_case(key)).map(|(&k, _)| k)
+        })
+    }
+
+    pub fn place(&mut self, def: Id, at: DVec3, rotate_deg: f64, name: Option<String>) -> Result<Id> {
+        let d = self.definitions.get(&def).ok_or_else(|| anyhow!("no component {def}"))?;
+        let name = name.unwrap_or_else(|| d.name.clone());
+        let t = DMat4::from_translation(at) * DMat4::from_rotation_z(rotate_deg.to_radians());
+        let id = self.new_id();
+        self.instances.insert(id, Instance { parent: self.active_group, def, name, transform: t, tag: None, hidden: false, material: None, attrs: Default::default() });
+        Ok(id)
+    }
+
+    /// Replace an instance with plain geometry (in a new group).
+    pub fn explode(&mut self, inst: Id) -> Result<Id> {
+        let i = self.instances.remove(&inst).ok_or_else(|| anyhow!("{inst} is not a component"))?;
+        let def = self.definitions[&i.def].model.clone();
+        let gid = self.new_id();
+        self.groups.insert(gid, Group { name: i.name.clone(), parent: i.parent, material: i.material, ..Default::default() });
+        let mut map: HashMap<Id, Id> = HashMap::new();
+        for (&k, v) in &def.vertices {
+            let id = self.new_id();
+            self.vertices.insert(id, crate::model::Vertex { p: i.transform.transform_point3(v.p), group: Some(gid) });
+            map.insert(k, id);
+        }
+        for e in def.edges.values() {
+            let id = self.edge(map[&e.a], map[&e.b]);
+            self.edges.get_mut(&id).unwrap().soft = e.soft;
+        }
+        let mirror = i.transform.determinant() < 0.0;
+        for f in def.faces.values() {
+            let mut nf = Face {
+                outer: f.outer.iter().map(|v| map[v]).collect(),
+                holes: f.holes.iter().map(|h| h.iter().map(|v| map[v]).collect()).collect(),
+                material: f.material.clone().or_else(|| def.group_material(f.group).map(str::to_string)),
+                uv: f.uv.and_then(|uv| uv.transformed(i.transform)),
+                group: Some(gid),
+                hidden: false,
+            };
+            if mirror {
+                nf.reverse();
+            }
+            if let Some(m) = &nf.material {
+                if let Some(dm) = def.materials.get(m) {
+                    self.materials.entry(m.clone()).or_insert_with(|| dm.clone());
+                }
+            }
+            self.insert_face(nf);
+        }
+        Ok(gid)
+    }
+
+    // ----- visibility -------------------------------------------------------
+
+    pub fn set_hidden(&mut self, ids: &[Id], hidden: bool) -> Result<()> {
+        for id in ids {
+            if let Some(f) = self.faces.get_mut(id) {
+                f.hidden = hidden;
+            } else if let Some(e) = self.edges.get_mut(id) {
+                e.hidden = hidden;
+            } else if let Some(g) = self.groups.get_mut(id) {
+                g.hidden = hidden;
+            } else if let Some(i) = self.instances.get_mut(id) {
+                i.hidden = hidden;
+            } else {
+                bail!("no entity {id}");
+            }
+        }
+        Ok(())
+    }
+
+    pub fn unhide_all(&mut self) {
+        self.faces.values_mut().for_each(|f| f.hidden = false);
+        self.edges.values_mut().for_each(|e| e.hidden = false);
+        self.groups.values_mut().for_each(|g| g.hidden = false);
+        self.instances.values_mut().for_each(|i| i.hidden = false);
+    }
+
+    pub fn set_tag(&mut self, ids: &[Id], tag: Option<String>) -> Result<()> {
+        if let Some(t) = &tag {
+            self.tags.entry(t.clone()).or_insert(true);
+        }
+        for id in ids {
+            if let Some(g) = self.groups.get_mut(id) {
+                g.tag = tag.clone();
+            } else if let Some(i) = self.instances.get_mut(id) {
+                i.tag = tag.clone();
+            } else {
+                bail!("tags go on groups and components ({id} is neither)");
+            }
+        }
+        Ok(())
+    }
+
+    pub fn soften(&mut self, ids: &[Id], soft: bool) -> Result<usize> {
+        let mut n = 0;
+        for id in ids {
+            if let Some(e) = self.edges.get_mut(id) {
+                e.soft = soft;
+                n += 1;
+            } else if let Some(f) = self.faces.get(id).cloned() {
+                // a face: soften its edges shared with coplanar neighbours
+                for l in f.loops() {
+                    for (a, b) in crate::model::pairs(l) {
+                        if let Some(e) = self.find_edge(a, b) {
+                            self.edges.get_mut(&e).unwrap().soft = soft;
+                            n += 1;
+                        }
+                    }
+                }
+            } else {
+                bail!("{id} is not an edge or face");
+            }
+        }
+        Ok(n)
+    }
+
+    /// Soften every edge that lies between two coplanar faces (cleans up
+    /// imported streets and split walls).
+    pub fn soften_coplanar(&mut self) -> usize {
+        let keys: Vec<(Id, Id, Id)> = self.edges.iter().map(|(&k, e)| (k, e.a, e.b)).collect();
+        let mut n = 0;
+        for (k, a, b) in keys {
+            let fs = self.faces_using_edge(a, b);
+            if fs.len() == 2 && self.normal(fs[0]).dot(self.normal(fs[1])) > 1.0 - 1e-6 {
+                self.edges.get_mut(&k).unwrap().soft = true;
+                n += 1;
+            }
+        }
+        n
+    }
+}

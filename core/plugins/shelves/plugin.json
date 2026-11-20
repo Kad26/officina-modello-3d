@@ -1,0 +1,14 @@
+{
+  "name": "Shelves",
+  "version": "1.0.0",
+  "author": "SketchCraft",
+  "description": "Builds a shelf unit from a few sizes, every board its own group (ready for Cut list).",
+  "commands": [
+    {
+      "id": "shelves",
+      "label": "Shelf unit…",
+      "hint": "A bookcase from width, depth, height and shelves",
+      "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#6b6f7d\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 3v18M19 3v18M5 4h14M5 10h14M5 16h14M5 20h14\"/></svg>"
+    }
+  ]
+}

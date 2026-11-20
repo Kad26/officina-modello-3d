@@ -1,0 +1,229 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+/* ---------- Learn ---------- */
+
+.learn-btn {
+  position: relative;
+}
+
+.learn-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  @include size(7px);
+  border-radius: 50%;
+  background: #f2c230;
+  box-shadow: 0 0 0 2px var(--panel);
+}
+
+.learn {
+  width: min(1040px, calc(100vw - 32px));
+}
+
+.learn-top {
+  margin: 4px 0 12px;
+}
+
+.learn-search {
+  flex: 1;
+  min-width: 180px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.learn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 12px;
+  max-height: 62vh;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.learn-card {
+  @include flex-col;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--line);
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  p,
+  ol {
+    margin: 0;
+  }
+
+  ol {
+    padding-left: 18px;
+    line-height: 1.5;
+  }
+
+  &.done {
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+  }
+
+  &.demo {
+    cursor: pointer;
+
+    &:hover {
+      box-shadow: inset 0 0 0 1px var(--line-strong);
+    }
+  }
+}
+
+.demo-frame {
+  overflow: hidden;
+  border-radius: calc(var(--radius) - 4px);
+  box-shadow: inset 0 0 0 1px var(--line);
+  line-height: 0;
+
+  img {
+    width: 100%;
+    height: auto;
+  }
+}
+
+.demo-big {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  @include grid-center;
+  align-content: center;
+  gap: 10px;
+  padding: 24px;
+  background: rgba(21, 19, 28, 0.82);
+  color: $white;
+  cursor: zoom-out;
+
+  img {
+    max-width: min(1100px, 100%);
+    max-height: 80vh;
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+
+  p {
+    max-width: 900px;
+    margin: 0;
+    text-align: center;
+  }
+
+  .muted {
+    color: rgba(255, 255, 255, 0.6);
+  }
+}
+
+.lesson-card {
+  position: absolute;
+  left: 14px;
+  bottom: 84px;
+  z-index: 7;
+  width: 300px;
+  padding: 12px 14px;
+  border-radius: $radius-lg;
+  background: var(--glass);
+  box-shadow: var(--shadow), inset 0 0 0 1px var(--line);
+
+  header {
+    @include row(8px);
+    margin-bottom: 8px;
+
+    b {
+      flex: 1;
+    }
+  }
+
+  .kicker {
+    font: 600 10px/1 "IBM Plex Mono", "SF Mono", Menlo, monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+  }
+
+  .rowbtn {
+    @include size(22px);
+    border-radius: $radius-sm;
+    color: var(--faint);
+  }
+
+  ol {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0;
+    display: grid;
+    gap: 6px;
+  }
+
+  li {
+    display: flex;
+    gap: 8px;
+    color: var(--faint);
+    font-size: $font-l;
+    line-height: 1.4;
+
+    &.now {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    &.ok {
+      color: var(--muted);
+    }
+
+    em {
+      display: block;
+      margin-top: 2px;
+      font-style: normal;
+      font-weight: 400;
+      color: var(--muted);
+    }
+  }
+
+  .tick {
+    @include grid-center;
+    flex: none;
+    @include size(18px);
+    border-radius: 50%;
+    font-size: 10px;
+    font-weight: 700;
+    box-shadow: inset 0 0 0 1.5px currentColor;
+  }
+
+  li.ok .tick {
+    background: var(--accent);
+    color: $white;
+    box-shadow: none;
+  }
+
+  li.now .tick {
+    color: var(--accent);
+  }
+}
+
+.lesson-demo {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  border-radius: $radius-md;
+}
+
+.demo-still {
+  @include grid-center;
+  aspect-ratio: 960 / 570;
+  background: var(--bg);
+  color: var(--muted);
+  font-weight: 600;
+  line-height: 1.4;
+}

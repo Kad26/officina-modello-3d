@@ -1,0 +1,74 @@
+name: Officina preview
+on:
+  push:
+    tags: ['officina-v*']
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: universal-apple-darwin
+            bundles: dmg
+            extension: dmg
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb
+            extension: deb
+    runs-on: ${{ matrix.os }}
+    env:
+      VITE_OFFICINA: '1'
+      CARGO_PROFILE_RELEASE_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
+        with:
+          toolchain: stable
+      - if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libxdo-dev
+      - run: npm ci --ignore-scripts
+        working-directory: app
+      - run: npm run tauri build -- --target "${{ matrix.target }}" --bundles "${{ matrix.bundles }}" -- --locked
+        working-directory: app
+      - name: Collect package
+        shell: bash
+        run: |
+          mkdir preview
+          find "target/${{ matrix.target }}/release/bundle" -name '*.${{ matrix.extension }}' -exec cp '{}' "preview/Officina-Modello-3D-${{ github.ref_name }}-${{ matrix.target }}.${{ matrix.extension }}" ';'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: preview-${{ matrix.target }}
+          path: preview/*
+          if-no-files-found: error
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          path: preview
+          merge-multiple: true
+      - name: Publish preview
+        working-directory: preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha256sum *.dmg *.deb > SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease \
+            --title 'Officina Modello 3D 0.1.0 — anteprima' \
+            --notes 'Build sperimentale di Officina, con layout laterale e strumenti di rendering. macOS Intel e Apple Silicon: firma ad hoc, senza notarizzazione Apple. Linux: pacchetto Debian/Ubuntu x86-64. Aggiornamenti manuali da questa pagina.' \
+            *.dmg *.deb SHA256SUMS.txt

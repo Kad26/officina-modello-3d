@@ -1,0 +1,132 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+/* ---------- v0.2: parity UI ---------- */
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 10px 0;
+  border-bottom: 1px solid var(--line);
+
+  button {
+    padding: 8px 10px 9px;
+    color: var(--muted);
+    font-weight: 560;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+
+    &.on {
+      color: var(--text);
+      border-bottom-color: var(--accent);
+    }
+  }
+}
+
+.section-title.sub {
+  margin: 14px 0 8px;
+  color: var(--muted);
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
+.layers li.dim .name {
+  color: var(--faint);
+}
+
+.layers li .eye {
+  @include grid-center-box(22px);
+  border-radius: $radius-sm;
+  color: var(--faint);
+  opacity: 0;
+}
+
+.layers li:hover .eye,
+.layers li.dim .eye {
+  opacity: 1;
+}
+
+.layers li .eye:hover {
+  background: var(--line);
+  color: var(--text);
+}
+
+.layers li.muted-row {
+  cursor: default;
+}
+
+.layers .rename {
+  @include fill;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  outline: none;
+}
+
+.chip-tag {
+  padding: 1px 6px;
+  border-radius: $radius-pill;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.tag-dot {
+  @include size(8px);
+  margin: 0 4px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+.editing-banner {
+  @include flex-between;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: $radius-md;
+  @include accent-on;
+  font-weight: 560;
+}
+
+.editing-banner button,
+.editing-pill {
+  padding: 3px 9px;
+  border-radius: $radius-sm;
+  background: var(--accent);
+  color: $white;
+  font-size: $font-s;
+  font-weight: 600;
+}
+
+.editing-pill {
+  margin-left: 6px;
+}
+
+.tile.on .tile-art {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.hint-text {
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: $font-m;
+}
+
+.wide-input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+
+.views-list {
+  margin-top: 10px;
+}
+
+.btn-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

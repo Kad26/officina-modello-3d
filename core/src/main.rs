@@ -1,0 +1,127 @@
+//! sketchcraft CLI
+//!
+//!   sketchcraft run <script.jsonl> [--open model.sketchcraft] [--save model.sketchcraft]
+//!       Run one JSON command per line (blank lines and # comments skipped),
+//!       print each reply. Stops at the first error unless --keep-going.
+//!
+//!   sketchcraft serve [--open model.sketchcraft]
+//!       Read commands from stdin, write one JSON reply per line to stdout.
+//!       This is the headless protocol the app speaks.
+//!
+//!   sketchcraft bridge [--port 5175]
+//!       Browser bridge for the UI on 127.0.0.1 (shares the live model file).
+//!
+//!   sketchcraft mcp [--doc model.sketchcraft] [--workspace DIR | --any-path]
+//!       MCP server on stdio for AI agents. With --doc, the model is loaded
+//!       from FILE (if it exists) and saved back after every change. The
+//!       agent's files stay in the workspace: --workspace DIR, else the model's
+//!       own folder; without --doc or --workspace it won't start (--any-path
+//!       lifts the limit). A home folder or drive root is refused.
+
+use sketchcraft::Engine;
+use serde_json::json;
+use std::io::{BufRead, Write};
+
+fn usage() -> ! {
+    eprintln!("usage:\n  sketchcraft run <script.jsonl> [--open FILE] [--save FILE] [--keep-going]\n  sketchcraft serve [--open FILE]\n  sketchcraft bridge [--port 5175]\n  sketchcraft mcp [--doc FILE] [--workspace DIR | --any-path]");
+    std::process::exit(2)
+}
+
+fn flag(args: &[String], name: &str) -> Option<String> {
+    args.iter().position(|a| a == name).and_then(|i| args.get(i + 1).cloned())
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut engine = Engine::new();
+    if let Some(path) = flag(&args, "--open") {
+        let r = engine.exec_json(&json!({"cmd": "open", "path": path}).to_string());
+        if r["ok"] != true {
+            eprintln!("{r}");
+            std::process::exit(1);
+        }
+    }
+    match args.first().map(String::as_str) {
+        Some("run") => {
+            let Some(script) = args.get(1) else { usage() };
+            let text = std::fs::read_to_string(script).unwrap_or_else(|e| {
+                eprintln!("can't read {script}: {e}");
+                std::process::exit(1)
+            });
+            let keep_going = args.iter().any(|a| a == "--keep-going");
+            let mut failed = false;
+            for (n, line) in text.lines().enumerate() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                let r = engine.exec_json(line);
+                println!("{}: {}", n + 1, r);
+                if r["ok"] != true {
+                    failed = true;
+                    if !keep_going {
+                        break;
+                    }
+                }
+            }
+            if let Some(path) = flag(&args, "--save") {
+                println!("{}", engine.exec_json(&json!({"cmd": "save", "path": path}).to_string()));
+            }
+            std::process::exit(if failed { 1 } else { 0 });
+        }
+        Some("serve") => {
+            let stdin = std::io::stdin();
+            let mut out = std::io::stdout().lock();
+            for line in stdin.lock().lines() {
+                let Ok(line) = line else { break };
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                let r = engine.exec_json(line);
+                writeln!(out, "{r}").ok();
+                out.flush().ok();
+            }
+        }
+        Some("bridge") => {
+            let port = flag(&args, "--port").and_then(|p| p.parse().ok()).unwrap_or(5175);
+            let live = sketchcraft::live::Live::open(sketchcraft::live::default_doc());
+            let opts = sketchcraft::http::Options {
+                port,
+                page: flag(&args, "--origin").unwrap_or_else(|| sketchcraft::http::DEFAULT_PAGE.into()),
+                token_file: flag(&args, "--token-file").map(Into::into),
+                token: std::env::var("SKETCHCRAFT_BRIDGE_TOKEN").ok().filter(|t| !t.is_empty()),
+            };
+            if let Err(e) = sketchcraft::http::serve_with(live, opts) {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        }
+        Some("mcp") => {
+            let doc = flag(&args, "--doc");
+            // an agent's files stay in one folder: --workspace, else the model's folder, else here
+            let workspace = if args.iter().any(|a| a == "--any-path") {
+                sketchcraft::policy::Workspace::anywhere()
+            } else {
+                // never guess: the folder is the one asked for, or the model file's own
+                let dir = flag(&args, "--workspace").map(std::path::PathBuf::from).or_else(|| doc.as_ref().and_then(|d| std::path::Path::new(d).parent().filter(|p| !p.as_os_str().is_empty()).map(|p| p.to_path_buf())));
+                let Some(dir) = dir else {
+                    eprintln!("sketchcraft mcp: say where the agent may work: --workspace DIR, or --doc FILE inside a folder of its own (or --any-path to allow every folder)");
+                    std::process::exit(2);
+                };
+                std::fs::create_dir_all(&dir).ok();
+                let ws = sketchcraft::policy::Workspace::at(dir);
+                if ws.too_wide() {
+                    eprintln!("sketchcraft mcp: {} is too wide a folder to hand to an agent (a drive root or your home folder). Use a folder of its own with --workspace DIR, or --any-path if you mean it", ws.root.as_ref().map(|r| r.display().to_string()).unwrap_or_default());
+                    std::process::exit(2);
+                }
+                ws
+            };
+            if let Some(root) = &workspace.root {
+                eprintln!("sketchcraft mcp: files limited to {}", root.display());
+            }
+            sketchcraft::mcp::serve(sketchcraft::mcp::Options { doc, workspace });
+        }
+        _ => usage(),
+    }
+}

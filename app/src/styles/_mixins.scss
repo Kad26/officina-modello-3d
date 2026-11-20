@@ -1,0 +1,72 @@
+// Layout and surface patterns the stylesheet repeats. Each emits exactly the declarations it names.
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin row($gap) {
+  display: flex;
+  align-items: center;
+  gap: $gap;
+}
+
+@mixin inline-row($gap) {
+  display: inline-flex;
+  align-items: center;
+  gap: $gap;
+}
+
+@mixin inline-flex-center {
+  display: inline-flex;
+  align-items: center;
+}
+
+@mixin flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+@mixin grid-center {
+  display: grid;
+  place-items: center;
+}
+
+@mixin grid-center-box($size) {
+  display: grid;
+  place-items: center;
+  width: $size;
+  height: $size;
+}
+
+@mixin size($size) {
+  width: $size;
+  height: $size;
+}
+
+@mixin cover {
+  position: absolute;
+  inset: 0;
+}
+
+@mixin truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@mixin fill {
+  flex: 1;
+  min-width: 0;
+}
+
+// the active/selected look of a chip, tab or row
+@mixin accent-on {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}

@@ -1,0 +1,38 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+/* ---------- one field look everywhere (corners, border, height, from the theme)
+   — the panels' own older rules had fixed 7px corners and other heights ---------- */
+
+:root {
+  --field-radius: calc(var(--radius) * 0.75);
+  --field-h: 28px;
+}
+
+:where(select, textarea, input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"])) {
+  border-radius: var(--field-radius);
+}
+
+.units-select,
+.field select,
+.field input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]),
+.strip-select select,
+.skin-edit select,
+.skin-edit input[type="text"],
+.attr-row input,
+.sheet.ask input,
+.more-tools input,
+.tl-inspect input,
+.tl-inspect select {
+  height: var(--field-h);
+  min-height: var(--field-h);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--field-radius);
+  background-color: var(--panel);
+  font-size: $font-l;
+}
+
+.strip-select select {
+  height: 26px;
+  min-height: 26px;
+}

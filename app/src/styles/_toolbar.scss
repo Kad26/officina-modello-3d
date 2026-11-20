@@ -1,0 +1,52 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+/* toolbar groups */
+
+.toolbar {
+  gap: 0;
+}
+
+.tool-group {
+  display: flex;
+  gap: 1px;
+  padding: 0 4px;
+  border-right: 1px solid var(--line);
+
+  &:last-of-type {
+    border-right: none;
+  }
+}
+
+.tool {
+  @include size(34px);
+  border-radius: 9px;
+}
+
+.chip {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  margin-left: 6px;
+
+  input {
+    @include cover;
+    opacity: 0;
+    cursor: pointer;
+  }
+}
+
+.views {
+  flex-wrap: wrap;
+  max-width: calc(100% - 28px);
+
+  button.on {
+    @include accent-on;
+  }
+}
+
+.vsep {
+  width: 1px;
+  margin: 4px 4px;
+  background: var(--line);
+}

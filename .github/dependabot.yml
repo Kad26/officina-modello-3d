@@ -1,0 +1,7 @@
+# Proposes updates to the pinned GitHub Actions (each is a full commit SHA).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

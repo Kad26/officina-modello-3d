@@ -1,0 +1,165 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+/* photoreal render window */
+
+.sheet.render-dlg {
+  width: min(980px, calc(100vw - 32px));
+}
+
+.render-view {
+  @include grid-center;
+  min-height: 300px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--line);
+
+  img {
+    display: block;
+    max-width: 100%;
+    max-height: 60vh;
+  }
+}
+/* room for the settings below while they're open */
+
+.render-dlg.more .render-view img {
+  max-height: 40vh;
+}
+
+.render-dlg.more .render-view {
+  min-height: 200px;
+}
+
+.render-empty {
+  color: var(--muted, #6b7083);
+  font-size: $font-xl;
+}
+
+.render-controls {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  align-items: center;
+
+  .row {
+    grid-column: 1 / -1;
+  }
+}
+
+.seg {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: $radius-md;
+  background: var(--bg, #f4f5f9);
+
+  button {
+    padding: 5px 12px;
+    border: 0;
+    border-radius: $radius-sm;
+    background: none;
+    font: inherit;
+    font-size: $font-l;
+    cursor: pointer;
+
+    &.on {
+      background: var(--panel);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+  }
+}
+/* the Render dialog's "More settings" */
+
+.render-controls .render-more-toggle {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.render-controls .render-looks {
+  grid-column: 1 / -1;
+  justify-self: start;
+  flex-wrap: wrap;
+}
+
+.render-more {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 20px;
+  margin: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line, #e3e5ec);
+  border-radius: 10px;
+
+  .field input[type="range"] {
+    width: 130px;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .field select {
+    width: 190px;
+  }
+
+  input[type="color"] {
+    width: 34px;
+    height: 24px;
+    padding: 1px;
+  }
+
+  .field.check {
+    gap: 6px;
+    margin-top: 0;
+  }
+
+  > .btn {
+    justify-self: start;
+    margin-top: 6px;
+  }
+}
+
+@media (max-width: 720px) {
+  .render-more {
+    grid-template-columns: 1fr;
+  }
+}
+
+.render-controls .warn {
+  color: var(--danger, #c0392b);
+}
+
+.render-light {
+  > .field.check, > .warn { grid-column: 1 / -1; }
+  .field input[type="number"] { width: 90px; }
+}
+
+.render-vray {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 8px 12px;
+  margin: 0;
+  border: 1px solid var(--line, #e3e5ec);
+  border-radius: 10px;
+
+  legend { padding: 0 5px; font-weight: 600; }
+  p { margin: 0; }
+  .row { flex-wrap: wrap; }
+  .field.check { margin: 0; }
+}
+
+.render-vray-report {
+  display: grid;
+  gap: 3px;
+}
+
+.render-vray-name, .render-vray-details li {
+  overflow-wrap: anywhere;
+}
+
+.render-vray-details {
+  summary { cursor: pointer; }
+  ul { margin: 4px 0 0; padding-inline-start: 20px; }
+}

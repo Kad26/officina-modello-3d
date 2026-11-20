@@ -1,0 +1,17 @@
+// Compile-time values only. Anything a theme or skin changes at runtime stays a CSS custom
+// property (see _tokens.scss and skins.ts).
+$white: #fff;
+$green: #30a46c;
+$blue: #3e8ef7;
+
+$radius-xs: 4px;
+$radius-sm: 6px;
+$radius-md: 8px;
+$radius-lg: 12px;
+$radius-pill: 99px;
+
+$font-xs: 11px;
+$font-s: 11.5px;
+$font-m: 12px;
+$font-l: 12.5px;
+$font-xl: 13px;

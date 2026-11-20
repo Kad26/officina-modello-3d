@@ -1,0 +1,42 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+/* ---------- the axis gizmo: top-right of the model ---------- */
+
+.axis-gizmo {
+  position: absolute;
+  top: var(--below-views, 66px);
+  right: 14px;
+  z-index: 6;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  .gizmo-bg {
+    fill: var(--panel, $white);
+    fill-opacity: 0;
+    transition: fill-opacity 0.15s;
+  }
+
+  &:hover .gizmo-bg {
+    fill-opacity: 0.55;
+  }
+
+  .gizmo-end {
+    cursor: pointer;
+
+    &.hover circle {
+      stroke: var(--text, #1d1e24);
+      stroke-width: 2;
+    }
+  }
+
+  text {
+    pointer-events: none;
+    font-family: inherit;
+  }
+}

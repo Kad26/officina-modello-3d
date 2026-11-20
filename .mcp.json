@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "sketchcraft": {
+      "command": "${HOME}/Documents/Companies/sketchcraft/target/release/sketchcraft",
+      "args": ["mcp", "--doc", "${HOME}/Documents/SketchCraft/live.sketchcraft"]
+    }
+  }
+}

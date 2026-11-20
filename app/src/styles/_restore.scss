@@ -1,0 +1,48 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+/* Restore from backup */
+
+.restore-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.restore-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 70px auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: $radius-md;
+
+  &:hover {
+    background: var(--accent-soft);
+  }
+}
+
+.restore-when {
+  display: grid;
+}
+
+.restore-acts {
+  display: flex;
+  gap: 6px;
+}
+
+.restore-sub {
+  margin: 14px 0 2px;
+}
+
+@media (max-width: 640px) {
+  .restore-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .restore-size {
+    display: none;
+  }
+}

@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Ask a question / share what you made
+    url: https://github.com/jasonsutter87/sketchcraft/discussions
+    about: How-to questions, ideas to talk through, and show-and-tell go in Discussions.
+  - name: 📖 User guide
+    url: https://github.com/jasonsutter87/sketchcraft/tree/main/docs/guide
+    about: How to draw, model, import, render and more.
+  - name: 🧩 Writing plugins
+    url: https://github.com/jasonsutter87/sketchcraft/blob/main/docs/PLUGINS.md
+    about: Build your own tools in JavaScript or run SketchUp Ruby scripts.
+  - name: 🔒 Report a security problem
+    url: https://github.com/jasonsutter87/sketchcraft/blob/main/SECURITY.md
+    about: Please report security issues privately, not as a public issue.

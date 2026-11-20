@@ -1,0 +1,69 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+/* ---------- the Plugins window ---------- */
+
+.sheet.plugins-dlg {
+  width: min(640px, calc(100vw - 32px));
+}
+
+.plugin-list {
+  display: grid;
+  max-height: 52vh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.plugin-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: start;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  &.off .plugin-about {
+    opacity: 0.55;
+  }
+}
+
+.plugin-about {
+  display: grid;
+  gap: 2px;
+}
+
+.plugin-switch {
+  padding-top: 2px;
+}
+
+.plugin-row .warn {
+  color: var(--danger);
+}
+
+.plugins-dlg .row .btn {
+  white-space: nowrap;
+}
+/* a plugin's form */
+
+.sheet.plugin-form {
+  width: min(460px, calc(100vw - 32px));
+}
+
+.plugin-fields {
+  row-gap: 8px;
+}
+
+.plugin-form .warn {
+  color: var(--danger);
+  margin: 8px 0 0;
+}
+/* plugin buttons on the tool bar: a dark theme lightens their grey strokes */
+
+[data-dark="1"] .tool .plugin-icon {
+  filter: brightness(1.8);
+}

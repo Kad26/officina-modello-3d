@@ -1,0 +1,63 @@
+name: 🐞 Bug report
+description: Something in SketchCraft doesn't work the way it should.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this! The more we can see, the faster we can fix it.
+        Can't open or import a file? Use **File won't open / import problem** instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: "I drew a rectangle, pressed P to push/pull it, and…"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open SketchCraft
+        2. Pick the Rectangle tool
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SketchCraft version
+      description: Shown in Help › About (or the bottom of the Learn panel).
+      placeholder: "0.3.5"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Windows
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: osversion
+    attributes:
+      label: OS version
+      placeholder: "macOS 26.6 / Windows 11 / Fedora 43"
+  - type: textarea
+    id: media
+    attributes:
+      label: Screenshots or screen recording
+      description: Drag images or a short video here. They help a lot.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Theme or layout you use, plugins installed, the model involved (attach it if you can share it).

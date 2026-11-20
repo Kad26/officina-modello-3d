@@ -1,0 +1,292 @@
+//! Export to Wavefront OBJ + MTL, which Blender, SketchUp-likes and most
+//! renderers open. Faces are triangulated (OBJ can't express holes).
+//! Textured faces carry UVs; their images go in `<name>_textures/`.
+
+use crate::geom;
+use crate::model::Model;
+use anyhow::Result;
+use std::fmt::Write as _;
+use std::path::Path;
+
+pub fn write_obj(m: &Model, path: &str) -> Result<usize> {
+    let p = Path::new(path);
+    if let Some(dir) = p.parent() {
+        std::fs::create_dir_all(dir).ok();
+    }
+    let mtl_path = p.with_extension("mtl");
+    let mtl_name = mtl_path.file_name().unwrap().to_string_lossy().to_string();
+
+    let mut mtl = String::new();
+    writeln!(mtl, "newmtl default\nKd 0.95 0.94 0.91\n")?;
+    for mat in m.materials.values() {
+        writeln!(mtl, "newmtl {}\nKd {} {} {}\n", color_id(mat.color), mat.color[0], mat.color[1], mat.color[2])?;
+    }
+
+    let mut obj = format!("# SketchCraft export\nmtllib {mtl_name}\n");
+    let mut count = 0usize;
+    let mut vn = 0usize;
+    // one object per group / component placement, so Blender gets one object per house
+    let mut objects: std::collections::BTreeMap<String, Vec<crate::components::WFace>> = Default::default();
+    for f in m.world_faces() {
+        let name = if let Some(i) = m.instances.get(&f.owner) {
+            format!("{}_{}", i.name, f.owner)
+        } else {
+            f.group.and_then(|g| m.groups.get(&g)).map(|g| g.name.clone()).unwrap_or_else(|| "Ungrouped".into())
+        };
+        objects.entry(name).or_default().push(f);
+    }
+    // component materials live in their definitions
+    let mut colors: std::collections::BTreeMap<String, [f32; 3]> = Default::default();
+    for (_, faces) in &objects {
+        for f in faces {
+            if let Some(c) = f.color {
+                colors.insert(color_id(c), c);
+            }
+        }
+    }
+    for (name, c) in &colors {
+        if !m.materials.keys().any(|k| mat_id(k) == *name) {
+            writeln!(mtl, "newmtl {}\nKd {} {} {}\n", name, c[0], c[1], c[2])?;
+        }
+    }
+    // textures: one material per image, the image beside the OBJ
+    let tex_dir_name = format!("{}_textures", p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "model".into()));
+    let mut tex_mats: std::collections::BTreeMap<String, String> = Default::default();
+    let mut vt = 0usize;
+    for (name, faces) in objects {
+        writeln!(obj, "o {}", obj_token(&name))?;
+        for f in faces {
+            let n = f.normal;
+            let tex = crate::texmap::of_face(m, &f).and_then(|(mname, t)| {
+                if let Some(id) = tex_mats.get(mname) {
+                    return Some((id.clone(), t));
+                }
+                let (ext, data) = crate::texmap::bytes(t).ok()?;
+                let file = crate::texmap::file_name(mname, ext);
+                let dir = p.with_file_name(&tex_dir_name);
+                std::fs::create_dir_all(&dir).ok()?;
+                std::fs::write(dir.join(&file), data).ok()?;
+                let id = format!("t_{}", file.rsplit_once('.').map(|x| x.0).unwrap_or(&file));
+                let c = m.find_material(mname).map(|x| x.color).unwrap_or([1.0; 3]);
+                writeln!(mtl, "newmtl {id}\nKd {} {} {}\nmap_Kd {tex_dir_name}/{file}\n", c[0], c[1], c[2]).ok()?;
+                tex_mats.insert(mname.to_string(), id.clone());
+                Some((id, t))
+            });
+            match &tex {
+                Some((id, _)) => writeln!(obj, "usemtl {id}")?,
+                None => writeln!(obj, "usemtl {}", f.color.map(color_id).unwrap_or_else(|| "default".into()))?,
+            }
+            writeln!(obj, "vn {:.6} {:.6} {:.6}", n.x, n.y, n.z)?;
+            vn += 1;
+            let map = tex.as_ref().map(|(_, t)| crate::texmap::Mapping::of(t, n));
+            for t in geom::triangulate(&f.outer, &f.holes, n) {
+                for p in t {
+                    writeln!(obj, "v {:.6} {:.6} {:.6}", p.x, p.y, p.z)?;
+                    if let Some(mp) = &map {
+                        let [u, v] = mp.uv(p);
+                        writeln!(obj, "vt {u:.6} {v:.6}")?;
+                    }
+                }
+                count += 1;
+                let b = count * 3;
+                if map.is_some() {
+                    vt += 3;
+                    writeln!(obj, "f {}/{}/{vn} {}/{}/{vn} {}/{}/{vn}", b - 2, vt - 2, b - 1, vt - 1, b, vt)?;
+                } else {
+                    writeln!(obj, "f {}//{vn} {}//{vn} {}//{vn}", b - 2, b - 1, b)?;
+                }
+            }
+        }
+    }
+    std::fs::write(p, obj)?;
+    std::fs::write(&mtl_path, mtl)?;
+    Ok(count)
+}
+
+/// One OBJ token: no spaces or control characters, so a name from the model
+/// can't start a new line (and a new directive) in the file.
+fn obj_token(name: &str) -> String {
+    name.chars().map(|c| if c.is_whitespace() || c.is_control() { '_' } else { c }).collect()
+}
+
+fn mat_id(name: &str) -> String {
+    obj_token(&name.replace('#', "c_"))
+}
+
+/// Materials are named by color, so the same color from a component and
+/// the main model share one material.
+pub fn color_id(c: [f32; 3]) -> String {
+    format!("c_{:02x}{:02x}{:02x}", (c[0] * 255.0).round() as u8, (c[1] * 255.0).round() as u8, (c[2] * 255.0).round() as u8)
+}
+
+/// Binary glTF (.glb): one mesh, one primitive per color. Z-up model is
+/// turned to glTF's Y-up. Opens in Blender, three.js, Unity, Unreal, macOS Quick Look.
+pub fn write_glb(m: &Model, path: &str) -> Result<usize> {
+    use serde_json::json;
+    // one primitive per color, or per textured material (with UVs)
+    struct Prim<'a> {
+        color: [f32; 3],
+        tex: Option<(&'a str, &'a crate::model::Texture)>,
+        /// roughness, metalness
+        pbr: (f32, f32),
+        pos: Vec<[f32; 3]>,
+        nor: Vec<[f32; 3]>,
+        uv: Vec<[f32; 2]>,
+    }
+    let mut by_key: std::collections::BTreeMap<String, Prim> = Default::default();
+    let mut tris = 0;
+    for f in m.world_faces() {
+        let c = f.color.unwrap_or([0.95, 0.94, 0.91]);
+        let tex = crate::texmap::of_face(m, &f);
+        let pbr = f.material.as_deref().and_then(|n| m.find_material(n).map(|mm| mm.pbr(n))).unwrap_or((0.85, 0.0));
+        let key = match tex {
+            Some((name, _)) => format!("t:{name}|{:.2},{:.2}", pbr.0, pbr.1),
+            None => format!("{}|{:.2},{:.2}", color_id(c), pbr.0, pbr.1),
+        };
+        let e = by_key.entry(key).or_insert(Prim { color: c, tex, pbr, pos: vec![], nor: vec![], uv: vec![] });
+        let n = f.normal;
+        let ny = [n.x as f32, n.z as f32, -n.y as f32];
+        let map = tex.map(|(_, t)| crate::texmap::Mapping::of(t, n));
+        for t in geom::triangulate(&f.outer, &f.holes, n) {
+            for p in t {
+                e.pos.push([p.x as f32, p.z as f32, -p.y as f32]);
+                e.nor.push(ny);
+                if let Some(mp) = &map {
+                    // glTF images start at the top
+                    let [u, v] = mp.uv(p);
+                    e.uv.push([u as f32, (1.0 - v) as f32]);
+                }
+            }
+            tris += 1;
+        }
+    }
+    let mut bin: Vec<u8> = Vec::new();
+    let (mut views, mut accessors, mut prims, mut mats) = (vec![], vec![], vec![], vec![]);
+    let (mut images, mut textures) = (vec![], vec![]);
+    for (i, (_, pr)) in by_key.iter().enumerate() {
+        let (c, pos, nor) = (&pr.color, &pr.pos, &pr.nor);
+        let mut lo = [f32::MAX; 3];
+        let mut hi = [f32::MIN; 3];
+        for p in pos {
+            for k in 0..3 {
+                lo[k] = lo[k].min(p[k]);
+                hi[k] = hi[k].max(p[k]);
+            }
+        }
+        for (arr, is_pos) in [(pos, true), (nor, false)] {
+            let off = bin.len();
+            for v in arr {
+                for x in v {
+                    bin.extend_from_slice(&x.to_le_bytes());
+                }
+            }
+            views.push(json!({"buffer": 0, "byteOffset": off, "byteLength": arr.len() * 12, "target": 34962}));
+            let mut acc = json!({"bufferView": views.len() - 1, "componentType": 5126, "count": arr.len(), "type": "VEC3"});
+            if is_pos {
+                acc["min"] = json!(lo);
+                acc["max"] = json!(hi);
+            }
+            accessors.push(acc);
+        }
+        let mut attrs = json!({"POSITION": accessors.len() - 2, "NORMAL": accessors.len() - 1});
+        let mut mat = json!({"pbrMetallicRoughness": {"baseColorFactor": [c[0], c[1], c[2], 1.0], "metallicFactor": pr.pbr.1, "roughnessFactor": pr.pbr.0}, "doubleSided": false});
+        if let (Some((name, t)), false) = (pr.tex, pr.uv.is_empty()) {
+            let off = bin.len();
+            for v in &pr.uv {
+                for x in v {
+                    bin.extend_from_slice(&x.to_le_bytes());
+                }
+            }
+            views.push(json!({"buffer": 0, "byteOffset": off, "byteLength": pr.uv.len() * 8, "target": 34962}));
+            accessors.push(json!({"bufferView": views.len() - 1, "componentType": 5126, "count": pr.uv.len(), "type": "VEC2"}));
+            attrs["TEXCOORD_0"] = json!(accessors.len() - 1);
+            if let Ok((ext, data)) = crate::texmap::bytes(t) {
+                while bin.len() % 4 != 0 {
+                    bin.push(0);
+                }
+                let off = bin.len();
+                bin.extend_from_slice(&data);
+                views.push(json!({"buffer": 0, "byteOffset": off, "byteLength": data.len()}));
+                images.push(json!({"bufferView": views.len() - 1, "mimeType": if ext == "jpg" { "image/jpeg" } else { "image/png" }, "name": name}));
+                textures.push(json!({"source": images.len() - 1, "sampler": 0}));
+                // the image shows as it is (not tinted by the material color)
+                mat["pbrMetallicRoughness"]["baseColorFactor"] = json!([1.0, 1.0, 1.0, 1.0]);
+                mat["pbrMetallicRoughness"]["baseColorTexture"] = json!({"index": textures.len() - 1});
+                mat["name"] = json!(name);
+            }
+        }
+        mats.push(mat);
+        prims.push(json!({"attributes": attrs, "material": i}));
+        while bin.len() % 4 != 0 {
+            bin.push(0);
+        }
+    }
+    let doc = json!({
+        "asset": {"version": "2.0", "generator": "SketchCraft"},
+        "scene": 0,
+        "scenes": [{"nodes": [0]}],
+        "nodes": [{"mesh": 0, "name": "SketchCraft model"}],
+        "meshes": [{"primitives": prims}],
+        "materials": mats,
+        "accessors": accessors,
+        "bufferViews": views,
+        "buffers": [{"byteLength": bin.len()}],
+    });
+    let mut doc = doc;
+    if !images.is_empty() {
+        doc["images"] = json!(images);
+        doc["textures"] = json!(textures);
+        // repeat, smooth
+        doc["samplers"] = json!([{"magFilter": 9729, "minFilter": 9987, "wrapS": 10497, "wrapT": 10497}]);
+    }
+    let mut js = serde_json::to_vec(&doc)?;
+    while js.len() % 4 != 0 {
+        js.push(b' ');
+    }
+    while bin.len() % 4 != 0 {
+        bin.push(0);
+    }
+    let total = 12 + 8 + js.len() + 8 + bin.len();
+    let mut out = Vec::with_capacity(total);
+    out.extend_from_slice(b"glTF");
+    out.extend_from_slice(&2u32.to_le_bytes());
+    out.extend_from_slice(&(total as u32).to_le_bytes());
+    out.extend_from_slice(&(js.len() as u32).to_le_bytes());
+    out.extend_from_slice(b"JSON");
+    out.extend_from_slice(&js);
+    out.extend_from_slice(&(bin.len() as u32).to_le_bytes());
+    out.extend_from_slice(b"BIN\0");
+    out.extend_from_slice(&bin);
+    if let Some(dir) = Path::new(path).parent() {
+        std::fs::create_dir_all(dir).ok();
+    }
+    std::fs::write(path, out)?;
+    Ok(tris)
+}
+
+/// Binary STL for 3D printing (meters; most slicers want mm, so pass scale 1000).
+pub fn write_stl(m: &Model, path: &str, scale: f64) -> Result<usize> {
+    let mut tris: Vec<([f32; 3], [[f32; 3]; 3])> = Vec::new();
+    for f in m.world_faces() {
+        let n = f.normal;
+        for t in geom::triangulate(&f.outer, &f.holes, n) {
+            let v = t.map(|p| [(p.x * scale) as f32, (p.y * scale) as f32, (p.z * scale) as f32]);
+            tris.push(([n.x as f32, n.y as f32, n.z as f32], v));
+        }
+    }
+    let mut out = vec![0u8; 80];
+    let header = b"SketchCraft binary STL";
+    out[..header.len()].copy_from_slice(header);
+    out.extend_from_slice(&(tris.len() as u32).to_le_bytes());
+    for (n, v) in &tris {
+        for x in n.iter().chain(v.iter().flatten()) {
+            out.extend_from_slice(&x.to_le_bytes());
+        }
+        out.extend_from_slice(&0u16.to_le_bytes());
+    }
+    if let Some(dir) = Path::new(path).parent() {
+        std::fs::create_dir_all(dir).ok();
+    }
+    std::fs::write(path, out)?;
+    Ok(tris.len())
+}

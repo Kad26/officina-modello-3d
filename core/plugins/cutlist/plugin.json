@@ -1,0 +1,14 @@
+{
+  "name": "Cut list",
+  "version": "1.0.0",
+  "author": "SketchCraft",
+  "description": "Lists the boards and sheet parts to cut, and how many 4×8 sheets and 8-foot boards to buy.",
+  "commands": [
+    {
+      "id": "cut-list",
+      "label": "Cut list…",
+      "hint": "Parts to cut from the selection (or the whole model), and sheets and boards to buy",
+      "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#6b6f7d\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"3\" width=\"16\" height=\"18\" rx=\"2\"/><path d=\"M8 8h8M8 12h8M8 16h5\"/></svg>"
+    }
+  ]
+}

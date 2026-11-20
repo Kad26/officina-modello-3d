@@ -1,0 +1,46 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+/* a skin's own tool icons (images) */
+
+.tool .skin-icon {
+  display: block;
+  @include size(20px);
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.more-list .skin-icon {
+  @include size(18px);
+  object-fit: contain;
+}
+
+.skin-icons {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+
+  > span {
+    flex: 1;
+  }
+}
+
+.skin-icon-names {
+  flex-basis: 100%;
+  margin: 0;
+  line-height: 1.5;
+}
+/* the Skins button: the brush with its name, so it doesn't read as a pencil */
+
+.skin-btn {
+  @include inline-row(6px);
+
+  svg {
+    @include size(15px);
+  }
+}

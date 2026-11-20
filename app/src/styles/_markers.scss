@@ -1,0 +1,113 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+/* inference marker colors */
+
+.snap-dot.endpoint {
+  background: $green;
+  border-color: $white;
+  box-shadow: 0 0 0 1.5px $green;
+}
+/* a point of a scan: an amber ring, so it reads as "on the cloud", not the model */
+
+.snap-dot.scan-point {
+  background: #f5a524;
+  border-color: $white;
+  box-shadow: 0 0 0 1.5px #b86e00;
+}
+
+.snap-dot.midpoint {
+  background: $blue;
+  border-color: $white;
+  box-shadow: 0 0 0 1.5px $blue;
+}
+
+.snap-dot.on-edge,
+.snap-dot.on-guide {
+  background: #e5484d;
+  border-color: $white;
+  box-shadow: 0 0 0 1.5px #e5484d;
+  border-radius: 2px;
+}
+
+.snap-dot.axis {
+  @include size(7px);
+  background: #1d1e24;
+  border-color: $white;
+}
+
+.snap-dot.face {
+  background: #3e63dd;
+  border-color: $white;
+  box-shadow: 0 0 0 1.5px #3e63dd;
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.snap-dot.guide-point {
+  background: $white;
+  border-color: #3e63dd;
+}
+/* the center of an arc or circle: a ring with a dot */
+
+.snap-dot.center {
+  background: $green;
+  border: 2.5px solid $white;
+  box-shadow: 0 0 0 1.5px $green;
+  @include size(11px);
+}
+/* the model's origin: a yellow square, where the three axes meet */
+
+.snap-dot.origin {
+  background: #f5c400;
+  border-color: #1d1e24;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1.5px $white;
+}
+
+.select-box {
+  position: absolute;
+  pointer-events: none;
+  border: 1.5px solid var(--accent);
+  background: rgba(107, 92, 255, 0.08);
+
+  &.crossing {
+    border-style: dashed;
+    background: rgba(48, 164, 108, 0.08);
+    border-color: $green;
+  }
+}
+
+.select-lasso {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  stroke: var(--accent);
+  stroke-width: 1.5px;
+  stroke-linejoin: round;
+  fill: rgba(107, 92, 255, 0.08);
+  fill-rule: evenodd;
+
+  &.crossing {
+    stroke: $green;
+    stroke-dasharray: 5 3;
+    fill: rgba(48, 164, 108, 0.08);
+  }
+}
+
+.mode-pill {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: $radius-pill;
+  background: var(--accent);
+  color: $white;
+  font-size: $font-m;
+  font-weight: 560;
+  pointer-events: none;
+  text-transform: none;
+}

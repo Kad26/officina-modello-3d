@@ -1,0 +1,59 @@
+name: 📂 File won't open / import problem
+description: A SketchUp, DXF, OBJ, STL or other file doesn't open, or looks wrong.
+title: "[Import]: "
+labels: ["bug", "import", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        File problems are almost always fixed fastest with **the file itself**.
+        If you can, zip it and drag it into the box below. Only attach files you're happy to share publicly.
+  - type: dropdown
+    id: format
+    attributes:
+      label: File type
+      options:
+        - SketchUp (.skp)
+        - DXF
+        - OBJ
+        - STL
+        - 3MF / glTF / other
+        - SketchCraft (.sketchcraft)
+    validations:
+      required: true
+  - type: input
+    id: saved
+    attributes:
+      label: Saved by
+      description: The program and version that saved the file, if you know it.
+      placeholder: "SketchUp 2017 / SketchUp for Web / AutoCAD 2024"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens?
+      description: The message you see, or what looks wrong (missing parts, wrong size, empty model…).
+      placeholder: "It says 'not a SketchUp 2013+ archive'…"
+    validations:
+      required: true
+  - type: textarea
+    id: file
+    attributes:
+      label: The file (zipped)
+      description: Drag a .zip here. A small sample that shows the problem is perfect.
+  - type: input
+    id: version
+    attributes:
+      label: SketchCraft version
+      placeholder: "0.3.5"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Linux
+    validations:
+      required: true

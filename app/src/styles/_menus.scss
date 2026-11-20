@@ -1,0 +1,78 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+/* context menu & dropdown */
+
+.menu-scrim {
+  @include cover;
+  z-index: 20;
+}
+
+.menu,
+.dropdown-menu {
+  position: absolute;
+  min-width: 200px;
+  padding: 5px;
+  border-radius: 11px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.menu-scrim > .menu {
+  min-width: min(200px, calc(100% - 16px));
+  max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+}
+
+.menu button,
+.dropdown-menu button {
+  @include flex-between;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  text-align: left;
+}
+
+.menu button:hover,
+.dropdown-menu button:hover {
+  @include accent-on;
+}
+
+.menu button.danger {
+  color: #c62a2f;
+
+  &:hover {
+    background: #fdecec;
+    color: #c62a2f;
+  }
+}
+
+.menu kbd {
+  color: var(--faint);
+  font: inherit;
+  font-size: $font-xs;
+}
+
+.dropdown {
+  position: relative;
+}
+
+.dropdown-menu {
+  right: 0;
+  top: 38px;
+  z-index: 30;
+  min-width: 240px;
+
+  small {
+    color: var(--faint);
+    font-size: $font-xs;
+  }
+}
+/* the measurement box sits above the toolbar's row so they never collide */
+
+.measure {
+  bottom: 74px;
+}

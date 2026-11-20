@@ -1,0 +1,35 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+input {
+  font: inherit;
+  color: inherit;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 248px 1fr 272px;
+  grid-template-rows: 52px 1fr;
+  height: 100%;
+}

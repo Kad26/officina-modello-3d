@@ -1,0 +1,15 @@
+{
+  "name": "Framing",
+  "version": "1.0.0",
+  "author": "SketchCraft",
+  "description": "Stud walls: click where a wall starts and ends; plates and studs at your spacing, every board its own group (ready for Cut list).",
+  "commands": [
+    {
+      "id": "stud-wall",
+      "label": "Stud wall",
+      "hint": "Click a wall's start and end: plates and studs",
+      "tool": true,
+      "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#6b6f7d\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 4h18M3 6h18M3 20h18M5 6v14M10 6v14M15 6v14M20 6v14\"/></svg>"
+    }
+  ]
+}

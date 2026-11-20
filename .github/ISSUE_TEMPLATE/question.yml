@@ -1,0 +1,20 @@
+name: ❓ Question
+description: Not sure how to do something? Ask here.
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The [user guide](https://github.com/jasonsutter87/sketchcraft/tree/main/docs/guide) and the **Learn** panel in the app answer a lot of questions. Still stuck? **[Discussions](https://github.com/jasonsutter87/sketchcraft/discussions)** is the best place to ask, where others can answer too. Or ask here.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SketchCraft version
+      placeholder: "0.3.5"

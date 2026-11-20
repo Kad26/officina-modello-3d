@@ -1,0 +1,86 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+/* ---------- Themes window: Theme, Layout and Icons sections ---------- */
+
+.theme-h {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 14px 0 8px;
+  font-weight: 650;
+
+  &:first-of-type {
+    margin-top: 4px;
+  }
+}
+
+.layout-pick {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.layout-card {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  grid-template-rows: auto 1fr;
+  column-gap: 12px;
+  row-gap: 2px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--line-strong));
+  }
+
+  &.on {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+}
+
+.layout-mini {
+  grid-row: 1 / 3;
+  width: 110px;
+  height: 66px;
+
+  .lm-frame {
+    fill: var(--bg);
+    stroke: var(--line-strong);
+  }
+
+  .lm-panel {
+    fill: var(--panel);
+  }
+
+  .lm-model {
+    fill: color-mix(in srgb, var(--accent) 6%, var(--bg));
+  }
+
+  .lm-bar {
+    fill: var(--panel);
+    stroke: var(--line);
+  }
+
+  .lm-bar2 {
+    fill: var(--bg);
+    stroke: var(--line);
+  }
+
+  .lm-float {
+    fill: var(--panel);
+    stroke: var(--line-strong);
+  }
+}
+
+.sheet .skin-icons {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}

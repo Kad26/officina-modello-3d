@@ -1,0 +1,121 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+/* ==========================================================================
+   Fields on brand: every select, text box and number box shares one look,
+   built from the skin's tokens (so Midnight, Blueprint and the rest follow).
+   :where() keeps these at zero specificity: a component's own sizing wins,
+   and anything unstyled (like the strip's Setting picker) gets the base.
+   ========================================================================== */
+
+:where(select, textarea, input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"])) {
+  box-sizing: border-box;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: calc(var(--radius) * 0.75);
+  background-color: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: $font-l;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+:where(textarea) {
+  padding: 6px 9px;
+  line-height: 1.45;
+}
+
+:where(input, textarea)::placeholder {
+  color: var(--faint);
+  opacity: 1;
+}
+/* dropdowns: the browser's arrow swapped for the brand chevron (drawn with
+   two gradients, so it takes the skin's color) */
+
+select:not([multiple]) {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 26px !important;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%) !important;
+  background-position: calc(100% - 14px) 52%, calc(100% - 9px) 52% !important;
+  background-size: 5px 5px, 5px 5px !important;
+  background-repeat: no-repeat !important;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+select:not([multiple]):hover,
+:where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]), textarea):hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line-strong));
+}
+
+select option {
+  background: var(--panel);
+  color: var(--text);
+}
+/* one focus ring everywhere: violet border, soft violet glow */
+
+select:focus-visible,
+textarea:focus-visible,
+input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]):focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+select:disabled,
+input:disabled,
+textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+/* checkboxes, radios and sliders in the brand violet */
+
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"] {
+  accent-color: var(--accent);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  @include size(15px);
+  cursor: pointer;
+}
+/* color wells: a rounded swatch with the field border, no browser frame */
+
+input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 2px;
+  border: 1px solid var(--line-strong);
+  border-radius: calc(var(--radius) * 0.6);
+  background: var(--panel);
+  cursor: pointer;
+
+  &::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+
+  &::-webkit-color-swatch {
+    border: none;
+    border-radius: calc(var(--radius) * 0.45);
+  }
+
+  &::-moz-color-swatch {
+    border: none;
+    border-radius: calc(var(--radius) * 0.45);
+  }
+}
+/* the strip's pickers (Setting, Floors) match the rest */
+
+.strip-select select {
+  height: 26px;
+  min-height: 26px;
+}
+/* the Value box keeps its own, stronger ring (it has no border) */
+
+.measure input:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}

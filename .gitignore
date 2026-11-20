@@ -1,0 +1,15 @@
+target/
+out/
+*.png
+!docs/*.png
+!brand/*.png
+node_modules/
+dist/
+app/src-tauri/gen/
+!app/src-tauri/icons/*.png
+
+# pentest reports stay local until the findings are fixed
+security-reports/
+
+# private research notes
+.research/

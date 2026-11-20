@@ -1,0 +1,90 @@
+{
+  "subdivision": {
+    "title": "Subdivision surfaces",
+    "about": "Model a rough cage of quads and smooth it, the way Blender’s Subdivision modifier does (subd / subdivide).",
+    "topic": "Shape",
+    "gif": "learn/subdivision.gif",
+    "frames": 5,
+    "captured": "2026-11-16"
+  },
+  "photo-modeling": {
+    "title": "Model from photos",
+    "about": "Mark the same corners in two matched photos; SketchCraft works out where they are in 3D and builds the faces.",
+    "topic": "Photos",
+    "gif": "learn/photo-modeling.gif",
+    "frames": 47,
+    "captured": "2026-11-16"
+  },
+  "hierarchy-tags": {
+    "title": "Groups, hierarchy and tags",
+    "about": "Groups inside groups, a click that picks the whole house, hiding a whole chain, and tags with colors and solo.",
+    "topic": "Organize",
+    "gif": "learn/hierarchy-tags.gif",
+    "frames": 17,
+    "captured": "2026-11-16"
+  },
+  "environments": {
+    "title": "Environments",
+    "about": "Put a model in a ready-made setting (suburban lot, city block, park, desert, waterfront) in one click.",
+    "topic": "Present",
+    "gif": "learn/environments.gif",
+    "frames": 19,
+    "captured": "2026-11-16"
+  },
+  "studio-render": {
+    "title": "Studio renders",
+    "about": "A seamless studio backdrop with softbox lights, and a photoreal render that sharpens while you watch.",
+    "topic": "Present",
+    "gif": "learn/studio-render.gif",
+    "frames": 13,
+    "captured": "2026-11-16"
+  },
+  "subd-mode": {
+    "title": "SubD mode",
+    "about": "Shape a smooth object by its cage: pick points, edges or faces, drag (the other side follows), add loops, extrude, crease.",
+    "topic": "Shape",
+    "gif": "learn/subd-mode.gif",
+    "frames": 14,
+    "captured": "2026-11-16"
+  },
+  "first-model": {
+    "title": "Your first model",
+    "about": "Draw a rectangle, pull it up, type exact sizes, and look around with the axis gizmo.",
+    "topic": "Basics",
+    "gif": "learn/first-model.gif",
+    "frames": 56,
+    "captured": "2026-11-16"
+  },
+  "move-corner": {
+    "title": "Move a single corner",
+    "about": "With nothing selected, Move grabs the corner under the cursor; the faces around it fold to stay flat.",
+    "topic": "Shape",
+    "gif": "learn/move-corner.gif",
+    "frames": 23,
+    "captured": "2026-11-16"
+  },
+  "shelves-cut-list": {
+    "title": "Plugins: shelves and a cut list",
+    "about": "The Shelves plugin builds a bookcase from a few sizes; the Cut list plugin lists the boards and what to buy.",
+    "topic": "Plugins",
+    "gif": "learn/shelves-cut-list.gif",
+    "frames": 14,
+    "captured": "2026-11-16"
+  },
+  "themes-layouts": {
+    "title": "Themes and layouts",
+    "about": "Classic (the SketchUp-like default) or SketchCraft’s own looks; docked or floating tool bars; your own icons.",
+    "topic": "Basics",
+    "gif": "learn/themes-layouts.gif",
+    "frames": 22,
+    "captured": "2026-11-16"
+  },
+  "workspaces": {
+    "title": "Workspaces",
+    "about": "Model, Arch, Design and Previz arrange the tools for the job: walls and plans, solids, scenes and renders.",
+    "topic": "Basics",
+    "gif": "learn/workspaces.gif",
+    "frames": 13,
+    "captured": "2026-11-16"
+  }
+}
