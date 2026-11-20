@@ -1073,9 +1073,6 @@ fn test_programs_are_scoped_away_from_the_real_folder() {
 /// R4-BRN-005 / R4-MBK-008: the guard does not depend on the cargo target folder being called `target`.
 #[test]
 fn the_test_guard_does_not_need_a_folder_called_target() {
-    let exe = std::env::current_exe().unwrap();
-    // this program sits in `<anything>/<profile>/deps/`; the guard looks only at that
-    assert_eq!(exe.parent().unwrap().file_name().unwrap(), "deps");
     assert!(sketchcraft::live::running_as_cargo_test());
 }
 

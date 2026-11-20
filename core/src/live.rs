@@ -102,15 +102,35 @@ fn weight(m: &crate::model::Model) -> usize {
     m.faces.len() + m.instances.len() + m.groups.len() + m.definitions.values().map(|d| weight(&d.model)).sum::<usize>()
 }
 
-/// True when this process is a Rust test program: a unit test (`cfg!(test)`), a program cargo put in
-/// a `deps/` folder (every test program is built there, whatever the target folder is called: a
-/// custom `CARGO_TARGET_DIR` works), or one that sets `SKETCHCRAFT_TESTING`. The shipped programs
-/// run from a `release/` folder or an install folder, never from `deps/`.
-pub fn running_as_cargo_test() -> bool {
-    if cfg!(test) || std::env::var_os("SKETCHCRAFT_TESTING").is_some_and(|v| !v.is_empty() && v != "0") {
+/// Recognize integration-test executables in either Cargo output layout.
+fn cargo_test_path(exe: &std::path::Path) -> bool {
+    let Some(dir) = exe.parent() else { return false };
+    if dir.file_name().is_some_and(|name| name == "deps") {
         return true;
     }
-    std::env::current_exe().ok().is_some_and(|p| p.parent().and_then(|d| d.file_name()).is_some_and(|n| n == "deps"))
+    // Cargo 1.100 puts test executables under build/<package>/<hash>/out.
+    let Some(hash) = dir.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()) else { return false };
+    dir.file_name().is_some_and(|name| name == "out")
+        && dir.ancestors().nth(3).and_then(|p| p.file_name()).is_some_and(|name| name == "build")
+        && hash.len() == 16 && hash.bytes().all(|b| b.is_ascii_hexdigit())
+        && exe.file_stem().and_then(|n| n.to_str()).is_some_and(|name| name.ends_with(hash))
+}
+
+/// True for a Rust test harness or an explicit test run.
+pub fn running_as_cargo_test() -> bool {
+    cfg!(test)
+        || std::env::var_os("SKETCHCRAFT_TESTING").is_some_and(|v| !v.is_empty() && v != "0")
+        || std::env::current_exe().ok().is_some_and(|p| cargo_test_path(&p))
+}
+
+#[cfg(test)]
+#[test]
+fn detects_both_cargo_test_layouts_but_not_an_installed_executable() {
+    use std::path::Path;
+    assert!(cargo_test_path(Path::new("custom/debug/deps/hardening-93ea4902a08c9c6e.exe")));
+    assert!(cargo_test_path(Path::new("custom/debug/build/sketchcraft-core/93ea4902a08c9c6e/out/hardening-93ea4902a08c9c6e")));
+    assert!(!cargo_test_path(Path::new("custom/debug/build/sketchcraft-core/93ea4902a08c9c6e/out/sketchcraft")));
+    assert!(!cargo_test_path(Path::new("local/out/sketchcraft")));
 }
 
 /// Where the person's model folder is. `SKETCHCRAFT_DOC` always wins (and scopes every folder
