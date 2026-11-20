@@ -39,5 +39,6 @@
       "signingIdentity": "-"
     },
     "createUpdaterArtifacts": false
-  }
+  },
+  "mainBinaryName": "officina-modello-3d"
 }

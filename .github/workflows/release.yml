@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 env:
-  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && 'officina-v0.1.0' || github.ref_name }}
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && 'officina-v0.1.0-rc.1' || github.ref_name }}
 jobs:
   build:
     strategy:
@@ -51,6 +51,11 @@ jobs:
         run: |
           mkdir preview
           find "target/${{ matrix.target }}/release/bundle" -name '*.${{ matrix.extension }}' -exec cp '{}' "preview/Officina-Modello-3D-${{ env.RELEASE_TAG }}-${{ matrix.target }}.${{ matrix.extension }}" ';'
+      - name: Check Linux binary path
+        if: runner.os == 'Linux'
+        run: |
+          dpkg-deb -x preview/*.deb "$RUNNER_TEMP/officina-package"
+          test -x "$RUNNER_TEMP/officina-package/usr/bin/officina-modello-3d"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: preview-${{ matrix.target }}
