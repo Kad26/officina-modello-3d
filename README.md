@@ -2,7 +2,9 @@
 
 Officina è una variante indipendente di [SketchCraft](https://github.com/jasonsutter87/sketchcraft), con menu di modellazione in italiano, strumenti a sinistra, struttura a destra e Officina Render.
 
-Se usi SketchUp per disegnare mobili o interni, puoi provare il flusso di Officina con un rettangolo, Spingi/tira e un gruppo. L’importazione SKP è disponibile, con compatibilità variabile a seconda del file.
+Officina Modello 3D è un progetto indipendente. Può importare file `.skp` creati con SketchUp. La compatibilità varia a seconda del file. SketchUp è un marchio di Trimble.
+
+Per provare il flusso di modellazione di un mobile o di un interno, disegna un rettangolo, usa Spingi/tira e crea un gruppo.
 
 Hai provato un modello? [Raccontaci cosa ha funzionato o segnala un problema](https://github.com/Kad26/officina-modello-3d/issues/new). Indica il sistema operativo e, per un file SKP, la versione con cui è stato salvato.
 
