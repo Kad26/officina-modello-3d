@@ -584,7 +584,8 @@ export default function App() {
       ...WORKSPACES.map((w) => ({ label: `${w.name} workspace`, hint: w.blurb, run: () => switchWs(w.id) })),
       ...(scene?.views ?? []).map((v) => ({ label: `Go to scene "${v.name}"`, hint: "Scenes", run: () => void showView(v) })),
     ];
-    return [...tools, ...act];
+    const solids = scene ? solidToolItems(scene, sel, run, setSel) : [];
+    return [...tools, ...solids, ...act];
   };
 
   const fileRef2 = useRef(file);
