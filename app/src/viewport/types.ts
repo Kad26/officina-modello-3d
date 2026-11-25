@@ -77,6 +77,7 @@ export interface Cam {
 export interface ViewportApi {
   applyTyped: (text: string) => void;
   fit: () => void;
+  fitSelection: (selection: Sel) => void;
   fitSoon: () => void;
   /** frame this box (world corners), e.g. where most of an imported drawing is */
   fitBox: (lo: Vec3, hi: Vec3) => void;

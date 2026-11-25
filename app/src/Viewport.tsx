@@ -1980,6 +1980,16 @@ export default function Viewport(props: Props) {
   props.api.current = {
     applyTyped,
     fit: () => fit(),
+    fitSelection: (selection) => {
+      const bounds = new THREE.Box3();
+      const point = new THREE.Vector3();
+      for (const positions of [trianglesOf(ownersOf(selection)), selectionLines(selection)]) {
+        for (let i = 0; i < positions.length; i += 3) {
+          bounds.expandByPoint(point.fromArray(positions, i));
+        }
+      }
+      if (!bounds.isEmpty()) fitTo(bounds, 0.15);
+    },
     fitSoon: () => {
       if (imageIgloo.current) {
         closeIgloo(false);

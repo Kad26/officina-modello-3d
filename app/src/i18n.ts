@@ -22,7 +22,7 @@ const LABELS: Readonly<Record<string, string>> = {
   "Hide Rest of Model": "Nascondi il resto del modello", "Perspective": "Prospettiva",
   "Parallel Projection": "Proiezione parallela", "Parallel": "Parallela", "Notes": "Annotazioni",
   "Isometric": "Isometrica", "Top": "Alto", "Front": "Fronte", "Right": "Destra", "Back": "Retro", "Left": "Sinistra",
-  "Zoom Extents": "Zoom estensioni", "Previous View": "Vista precedente", "Next View": "Vista successiva",
+  "Zoom Extents": "Zoom estensioni", "Zoom to selection": "Zoom sulla selezione", "Previous View": "Vista precedente", "Next View": "Vista successiva",
   "Previous view": "Vista precedente", "Next view": "Vista successiva", "Plan": "Pianta",
   "Search Commands…": "Cerca comandi…", "Keyboard Shortcuts…": "Scorciatoie da tastiera…",
   "Learn SketchCraft…": "Impara SketchCraft…", "Customize Toolbar…": "Personalizza barre degli strumenti…",

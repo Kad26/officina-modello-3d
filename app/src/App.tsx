@@ -836,7 +836,7 @@ export default function App() {
     const toggleStyle = (id: keyof Styles, label: string, checked = !!styles[id]): DesktopAction => ({
       label, checked, run: () => setStyles((s) => ({ ...s, [id]: !checked })),
     });
-    const related = scene ? contextItems(scene, sel, run, setSel, () => api.current?.fit(), api.current?.sectionPlane(), (id) => api.current?.editCage(id), say) : [];
+    const related = scene ? contextItems(scene, sel, run, setSel, () => api.current?.fitSelection(sel), api.current?.sectionPlane(), (id) => api.current?.editCage(id), say) : [];
     const sceneTab = (nextTab: Tab, label: string): DesktopAction => ({
       label, checked: ws.showLeft && tab === nextTab, run: () => editWs({ showLeft: true, leftTab: nextTab }),
     });
@@ -1213,7 +1213,7 @@ export default function App() {
             }}
           />
         )}
-        {menu && scene && <ContextMenu x={menu.x} y={menu.y} close={() => setMenu(null)} items={contextItems(scene, sel, run, setSel, () => api.current?.fit(), api.current?.sectionPlane(), (id) => api.current?.editCage(id), say)} />}
+        {menu && scene && <ContextMenu x={menu.x} y={menu.y} close={() => setMenu(null)} items={contextItems(scene, sel, run, setSel, () => api.current?.fitSelection(sel), api.current?.sectionPlane(), (id) => api.current?.editCage(id), say)} />}
       </main>
 
       {trayPanels ? (
