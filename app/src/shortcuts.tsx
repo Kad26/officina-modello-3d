@@ -12,6 +12,14 @@ type ShortcutSection = [title: string, rows: [keys: string, action: string][]];
 function sections(): ShortcutSection[] {
   const copy = copyModifier();
   const option = optionModifier();
+  const eraserKeys: [string, string][] = sketchUpWindowsKeys ? [
+    ["Ctrl", tt("Soften with Eraser", "Ammorbidisci con la Gomma")],
+    ["Alt", tt("Unsoften with Eraser", "Rimuovi l’ammorbidimento con la Gomma")],
+    ["⇧", tt("Hide with Eraser", "Nascondi con la Gomma")],
+  ] : [
+    [`${copy}+click`, "Eraser: soften (add Shift to unsoften)"],
+    ["⇧ click", "Eraser: hide"],
+  ];
   return [
   [
     "Tools",
@@ -74,8 +82,7 @@ function sections(): ShortcutSection[] {
       [`Shift+${copy}+click`, "Remove"],
       [`${option}+click`, "Paint Bucket: sample a material"],
       ["⇧ click", "Paint Bucket: paint every matching face"],
-      [`${copy}+click`, "Eraser: soften (add Shift to unsoften)"],
-      ["⇧ click", "Eraser: hide"],
+      ...eraserKeys,
     ],
   ],
   ...(isWindows() ? [[

@@ -790,7 +790,7 @@ fn cut_tools_leave_disjoint_or_touching_parts_unchanged() {
 }
 
 #[test]
-fn cut_tools_reject_inconsistent_faces_and_inward_shells() {
+fn solid_tools_reject_inconsistent_faces_and_inward_shells() {
     for reverse_whole_shell in [false, true] {
         let mut e = Engine::new();
         let target = box_group(&mut e, [3.0, 5.0, 7.0], [4.0, 6.0, 8.0], "Target");
@@ -801,20 +801,24 @@ fn cut_tools_reject_inconsistent_faces_and_inward_shells() {
             run(&mut e, json!({"cmd":"faces","group":target,"facing":[0,0,1]}))["faces"][0]["id"].as_u64().unwrap()
         };
         run(&mut e, json!({"cmd":"reverse","ids":[reversed]}));
-        let before = run(&mut e, json!({"cmd":"info"}));
+        let before = serde_json::to_value(&e.model).unwrap();
+        let history = e.undo_depth();
 
         let reason = if reverse_whole_shell { "inward-facing faces" } else { "inconsistently oriented faces" };
-        for op in ["trim", "subtract"] {
-            let r = e.exec_json(&json!({"cmd":"solid","op":op,"ids":[cutter,target]}).to_string());
-            assert_eq!(r["ok"], false, "{op}: {r}");
-            assert!(r["error"].as_str().unwrap().contains(reason), "{r}");
-            assert_eq!(run(&mut e, json!({"cmd":"info"})), before);
+        for op in ["trim", "subtract", "union", "intersect", "split", "outer_shell"] {
+            for ids in [[cutter, target], [target, cutter]] {
+                let r = e.exec_json(&json!({"cmd":"solid","op":op,"ids":ids}).to_string());
+                assert_eq!(r["ok"], false, "{op}: {r}");
+                assert!(r["error"].as_str().unwrap().contains(reason), "{r}");
+                assert_eq!(serde_json::to_value(&e.model).unwrap(), before);
+                assert_eq!(e.undo_depth(), history);
+            }
         }
     }
 }
 
 #[test]
-fn loose_edge_disqualifies_a_closed_shell_from_volume_and_cutting() {
+fn loose_edge_disqualifies_a_closed_shell_from_volume_and_solid_tools() {
     let mut e = Engine::new();
     let target = box_group(&mut e, [0.0, 0.0, 0.0], [1.0, 1.0, 1.0], "Target");
     let cutter = box_group(&mut e, [0.25, 0.25, -0.1], [0.75, 0.75, 1.1], "Cutter");
@@ -829,12 +833,53 @@ fn loose_edge_disqualifies_a_closed_shell_from_volume_and_cutting() {
     assert_eq!(inspection["solid"], false);
     assert_eq!(inspection["findings"][0]["kind"], "loose_edges");
     assert_eq!(inspection["findings"][0]["count"], 1);
-    for op in ["trim", "subtract"] {
+    for op in ["trim", "subtract", "union", "intersect", "split", "outer_shell"] {
         let r = e.exec_json(&json!({"cmd":"solid","op":op,"ids":[cutter,target]}).to_string());
         assert_eq!(r["ok"], false, "{op}: {r}");
         assert!(r["error"].as_str().unwrap().contains("1 loose edge"), "{r}");
         assert_eq!(serde_json::to_value(&e.model).unwrap(), before);
     }
+}
+
+#[test]
+fn solid_tools_refuse_to_flatten_or_discard_attached_objects() {
+    let mut e = Engine::new();
+    let cutter = box_group(&mut e, [0.25, 0.25, -0.1], [0.75, 0.75, 1.1], "Cutter");
+    let panel = box_group(&mut e, [0.0, 0.0, 0.0], [1.0, 1.0, 1.0], "Panel");
+    let handle = box_group(&mut e, [0.1, -0.1, 0.3], [0.2, 0.0, 0.4], "Handle");
+    run(&mut e, json!({"cmd":"set_parent","ids":[handle],"parent":panel}));
+    run(&mut e, json!({"cmd":"lock","ids":[handle]}));
+    let assert_refused = |e: &mut Engine, assembly: u64| {
+        let before = serde_json::to_value(&e.model).unwrap();
+        let history = e.undo_depth();
+        for op in ["union", "intersect", "split", "outer_shell"] {
+            for ids in [[assembly, cutter], [cutter, assembly]] {
+                let r = e.exec_json(&json!({"cmd":"solid","op":op,"ids":ids}).to_string());
+                assert_eq!(r["ok"], false, "{op}: {r}");
+                assert!(r["error"].as_str().unwrap().contains("select an individual solid"), "{r}");
+                assert_eq!(serde_json::to_value(&e.model).unwrap(), before);
+                assert_eq!(e.undo_depth(), history);
+            }
+        }
+    };
+    assert_refused(&mut e, panel);
+
+    // The hardware can also be a placed component.
+    run(&mut e, json!({"cmd":"lock","ids":[handle],"locked":false}));
+    let inst = run(&mut e, json!({"cmd":"make_component","ids":[handle],"name":"Lever"}))["instance"].as_u64().unwrap();
+    run(&mut e, json!({"cmd":"set_parent","ids":[inst],"parent":panel}));
+    assert_refused(&mut e, panel);
+
+    // A placed assembly would flatten the groups in its shared definition.
+    run(&mut e, json!({"cmd":"set_parent","ids":[inst],"parent":null}));
+    let assembly = run(&mut e, json!({"cmd":"make_component","ids":[panel],"name":"Panel assembly"}))["instance"].as_u64().unwrap();
+    run(&mut e, json!({"cmd":"edit","id":assembly}));
+    run(&mut e, json!({"cmd":"begin_group","name":"Hardware"}));
+    let face = run(&mut e, json!({"cmd":"rect","from":[0.1,-0.1,0.3],"to":[0.2,0.0,0.3]}))["face"].as_u64().unwrap();
+    run(&mut e, json!({"cmd":"pushpull","face":face,"distance":0.1}));
+    run(&mut e, json!({"cmd":"end_group"}));
+    run(&mut e, json!({"cmd":"close"}));
+    assert_refused(&mut e, assembly);
 }
 
 #[test]

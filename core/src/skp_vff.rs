@@ -265,12 +265,7 @@ pub fn parse(d: &[u8], version: String) -> Result<SkpFile> {
         let color = [ch("colorRed"), ch("colorGreen"), ch("colorBlue")];
         file.materials.insert(id as u32, (name.trim_start_matches("_LC_").to_string(), color));
         if attr("hasTexture").as_deref() == Some("1") {
-            // the base image: the first <mat:image path="./...">
-            let img = xml.find("<mat:image ").and_then(|i| {
-                let j = xml[i..].find("path=\"./")? + i + 8;
-                Some(xml[j..j + xml[j..].find('"')?].to_string())
-            });
-            let bytes = img.and_then(|p| read(&format!("materials/{name}/{p}"), MAX_PICTURE));
+            let bytes = material_image_entry(&xml, name).and_then(|entry| read(&entry, MAX_PICTURE));
             // bounded work: a count, a pixel budget and (with the deadline above) a time limit
             let shown = name.trim_start_matches("_LC_");
             if bytes.is_none() && xml.contains("<mat:image ") {
@@ -311,6 +306,26 @@ pub fn parse(d: &[u8], version: String) -> Result<SkpFile> {
     }
     file.textures = textures;
     Ok(file)
+}
+
+/// A material can reference its own bitmap or share one stored elsewhere in the SKP.
+fn material_image_entry(xml: &str, material: &str) -> Option<String> {
+    let image = &xml[xml.find("<mat:image ")?..];
+    let (tag, _) = image.split_once('>')?;
+    let (start, key) = tag.match_indices("path=\"")
+        .find(|(at, _)| tag[..*at].ends_with(char::is_whitespace))?;
+    let (path, _) = tag[start + key.len()..].split_once('"')?;
+    let entry = if let Some(relative) = path.strip_prefix("./") {
+        format!("materials/{material}/{relative}")
+    } else if path.starts_with("materials/") {
+        path.to_owned()
+    } else {
+        return None;
+    };
+    if entry.contains('\\') || entry.split('/').any(|part| matches!(part, "" | "." | "..")) {
+        return None;
+    }
+    Some(entry)
 }
 
 fn texture_size(xml: &str, fallback_width: f64, bitmap_aspect: f64) -> (f64, f64) {

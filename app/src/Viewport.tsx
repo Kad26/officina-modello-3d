@@ -43,6 +43,18 @@ export type { Tool, BuildSettings, FaceStyle, Backdrop, Styles, Cam, ViewportApi
 // display units come from the model; set whenever a scene arrives
 let units = "m";
 const fmt = (x: number) => formatLength(x, units);
+type EraserMode = "delete" | "hide" | "soften" | "unsoften";
+const eraserModifier = { Shift: "hide", Control: "soften", Alt: "unsoften" } as const;
+
+function eraserModeLabel(mode: EraserMode) {
+  switch (mode) {
+    case "hide": return tt("Hide edges", "Nascondi spigoli");
+    case "soften": return tt("Soften edges", "Ammorbidisci spigoli");
+    case "unsoften": return tt("Unsoften edges", "Rimuovi ammorbidimento");
+    default: return "";
+  }
+}
+
 const lassoCrossing = (direction: number) => direction * (sketchUpWindowsKeys ? -1 : 1) > 0;
 
 
@@ -88,7 +100,9 @@ export default function Viewport(props: Props) {
   /** How many quick presses in a row (1 single, 2 double, 3 triple) and the last press */
   const clicks = useRef(1);
   const lastDown = useRef<{ t: number; x: number; y: number; button: number } | null>(null);
-  const transformCopy = useRef<{ enabled: boolean; tap: "Alt" | "Control" | null }>({ enabled: false, tap: null });
+  const transformCopy = useRef(false);
+  const modifierTap = useRef<keyof typeof eraserModifier | null>(null);
+  const eraseMode = useRef<EraserMode>("delete");
   const pushCopy = useRef(false);
   const pushStretch = useRef(false);
   live.current = props;
@@ -923,6 +937,7 @@ export default function Viewport(props: Props) {
 
   useEffect(() => {
     if (!t.current) return;
+    eraseMode.current = "delete";
     if (tool === "tape" && sketchUpWindowsKeys) {
       tapeMode.current = "line";
       setTapeBadge("line");
@@ -1164,15 +1179,16 @@ export default function Viewport(props: Props) {
     return id == null ? null : { id, p: sn.p.clone(), far };
   }
 
-  /** The whole curve an edge belongs to (an arc, a circle, a welded run). */
-  function curveOf(id: number): number[] {
+  /** Edges of the same arc, circle or weld; optionally just those with the given soft state. */
+  function curveOf(id: number, soft?: boolean): number[] {
     const s = sceneNow();
-    const c = s.edgeList.find((x) => x.id === id)?.curve;
-    return c == null ? [id] : s.edgeList.filter((x) => x.curve === c).map((x) => x.id);
+    const edge = s.edgeList.find((x) => x.id === id);
+    if (edge?.curve == null) return soft == null || edge?.soft === soft ? [id] : [];
+    return s.edgeList.filter((x) => x.curve === edge.curve && (soft == null || x.soft === soft)).map((x) => x.id);
   }
 
   /** Editable edge under the cursor (within 5 px, not hidden behind a face). */
-  function pickEdge(e: { clientX: number; clientY: number }): number | null {
+  function pickEdge(e: { clientX: number; clientY: number }, includeSoft = false): number | null {
     const s = sceneNow();
     const T = t.current!;
     const r = rect();
@@ -1185,7 +1201,7 @@ export default function Viewport(props: Props) {
     };
     let best: { id: number; d: number } | null = null;
     for (const ed of s.edgeList) {
-      if (ed.soft && !live.current.styles.xray && live.current.tool !== "flipedge") continue;
+      if (ed.soft && !includeSoft && !live.current.styles.xray && live.current.tool !== "flipedge") continue;
       // edges inside a closed group belong to the group: the click takes the group
       if (selectableGroup(ed.group) != null) continue;
       const a = sc(V(ed.a));
@@ -1422,8 +1438,8 @@ export default function Viewport(props: Props) {
   function cancel() {
     pushCopy.current = false;
     pushStretch.current = false;
-    transformCopy.current.enabled = false;
-    transformCopy.current.tap = null;
+    transformCopy.current = false;
+    modifierTap.current = null;
     const op = st.current.op;
     st.current.op = null;
     const canvas = t.current?.renderer.domElement;
@@ -1433,7 +1449,9 @@ export default function Viewport(props: Props) {
     setHint(null);
     setBox(null);
     setLasso(null);
-    live.current.onMeasure(sketchUpWindowsKeys && live.current.tool === "tape" ? tapeModeLabel(tapeMode.current) : "", "");
+    const idleLabel = sketchUpWindowsKeys && live.current.tool === "tape"
+      ? tapeModeLabel(tapeMode.current) : eraserModeLabel(eraseMode.current);
+    live.current.onMeasure(idleLabel, "");
   }
 
   function toScreen2(p: THREE.Vector3) {
@@ -2214,7 +2232,7 @@ export default function Viewport(props: Props) {
     if (op?.t !== "push") return;
     pushCopy.current = false;
     pushStretch.current = false;
-    transformCopy.current.tap = null;
+    modifierTap.current = null;
     st.current.op = null;
     clearPreview();
     if (Math.abs(op.d) < 1e-3) return;
@@ -2232,8 +2250,8 @@ export default function Viewport(props: Props) {
   async function commitMove() {
     const op = st.current.op;
     if (op?.t !== "move") return;
-    transformCopy.current.enabled = false;
-    transformCopy.current.tap = null;
+    transformCopy.current = false;
+    modifierTap.current = null;
     st.current.op = null;
     clearPreview();
     if (op.delta.length() < 1e-6) return;
@@ -2247,8 +2265,8 @@ export default function Viewport(props: Props) {
   async function commitRotate() {
     const op = st.current.op;
     if (op?.t !== "rotate" || !op.ref) return;
-    transformCopy.current.enabled = false;
-    transformCopy.current.tap = null;
+    transformCopy.current = false;
+    modifierTap.current = null;
     st.current.op = null;
     clearPreview();
     if (live.current.tool === "protractor") {
@@ -2667,6 +2685,28 @@ export default function Viewport(props: Props) {
       return;
     };
 
+    const currentEraserMode = (e: MouseEvent | KeyboardEvent): EraserMode => {
+      if (sketchUpWindowsKeys && e.altKey) return "unsoften";
+      if (e.ctrlKey || e.altKey) return e.shiftKey ? "unsoften" : "soften";
+      return e.shiftKey ? "hide" : eraseMode.current;
+    };
+
+    const updateHover = (tool: Tool, e: { clientX: number; clientY: number }, mode?: EraserMode) => {
+      const he = ["select", "erase", "move"].includes(tool) ? pickEdge(e, mode === "unsoften") : null;
+      const id = he == null && mode !== "soften" && mode !== "unsoften" ? pick(e)?.owner ?? null : null;
+      if (id !== st.current.hover || he !== st.current.hoverEdge) {
+        st.current.hover = id;
+        st.current.hoverEdge = he;
+        drawOverlay();
+      }
+    };
+    const refreshEraserHover = (e: KeyboardEvent) => {
+      if (live.current.scene && el.matches(":hover")) {
+        const { x, y } = lastPointer.current;
+        updateHover("erase", { clientX: x, clientY: y }, currentEraserMode(e));
+      }
+    };
+
     const move = (e: PointerEvent) => {
       lastPointer.current = { x: e.clientX, y: e.clientY };
       const right = st.current.rightDown;
@@ -2777,14 +2817,7 @@ export default function Viewport(props: Props) {
       if (["axes", "line", "freehand", "arc", "arccenter", "arc3", "pie", "rect", "rrect", "circle", "polygon", "tape", "dimension", "text", "move", "rotate", "scale", "place", "wall", "stairs", "column", "protractor"].includes(L.tool)) showSnap(infer(E, e, {}));
       else setHint(null);
       if (["select", "erase", "paint", "push", "offset", "followme", "section", "move", "rotate", "scale", "roof"].includes(L.tool)) {
-        const he = ["select", "erase", "move"].includes(L.tool) ? pickEdge(e) : null;
-        const h = he == null ? pick(e) : null;
-        const id = h ? h.owner : null;
-        if (id !== st.current.hover || he !== st.current.hoverEdge) {
-          st.current.hover = id;
-          st.current.hoverEdge = he;
-          drawOverlay();
-        }
+        updateHover(L.tool, e, sketchUpWindowsKeys && L.tool === "erase" ? currentEraserMode(e) : undefined);
       }
     };
 
@@ -3001,7 +3034,7 @@ export default function Viewport(props: Props) {
         if (q && q.distanceTo(op.center) > 1e-4) op.ref = q;
         return;
       }
-      const copy = sketchUpWindowsKeys ? transformCopy.current.enabled : e.altKey || e.ctrlKey;
+      const copy = sketchUpWindowsKeys ? transformCopy.current : e.altKey || e.ctrlKey;
       // nothing selected, Move on a corner: grab just that point (the faces around it follow)
       if (L.tool === "move" && selIds(sel).length === 0 && !copy) {
         const v = vertexUnder(e);
@@ -3038,7 +3071,7 @@ export default function Viewport(props: Props) {
       return;
     };
     const downTape = async ({ e, L, E, op }: DownArgs) => {
-      transformCopy.current.tap = null;
+      modifierTap.current = null;
       if (op?.t === "tape") {
         const target = infer(E, e, { anchor: op.p0, lock: st.current.lock }).p;
         return void (await commitTape(tapeTarget(op, target)));
@@ -3203,15 +3236,18 @@ export default function Viewport(props: Props) {
       return;
     };
     const downErase = async ({ e }: DownArgs) => {
-      const he = pickEdge(e);
-      const soften = e.altKey || e.ctrlKey;
-      if (he != null) {
-        if (soften) return void (await run({ cmd: "soften", ids: curveOf(he), soft: !e.shiftKey }));
-        return void (await run({ cmd: e.shiftKey ? "hide" : "delete", ids: curveOf(he) }));
+      if (sketchUpWindowsKeys && e.getModifierState("AltGraph")) return;
+      const mode = currentEraserMode(e);
+      const he = pickEdge(e, sketchUpWindowsKeys && mode === "unsoften");
+      if (mode === "soften" || mode === "unsoften") {
+        const soft = mode === "soften";
+        const ids = he == null ? [] : curveOf(he, sketchUpWindowsKeys ? !soft : undefined);
+        if (ids.length) await run({ cmd: "soften", ids, soft });
+        return;
       }
-      const h = pick(e);
-      if (h && !soften) await run({ cmd: e.shiftKey ? "hide" : "delete", ids: [entityOf(h).id] });
-      return;
+      const h = he == null ? pick(e) : null;
+      const ids = he != null ? curveOf(he) : h ? [entityOf(h).id] : [];
+      if (ids.length) await run({ cmd: mode, ids });
     };
     const downSection = async ({ e, L }: DownArgs) => {
       const h = pick(e);
@@ -3259,7 +3295,7 @@ export default function Viewport(props: Props) {
     };
 
     const down = async (e: PointerEvent) => {
-      transformCopy.current.tap = null;
+      modifierTap.current = null;
       const L = live.current;
       // PointerEvent.detail is 0 in Chromium (and WebView2), so count clicks here: the same place, quickly
       const now = e.timeStamp;
@@ -3666,28 +3702,48 @@ export default function Viewport(props: Props) {
     };
 
     const modifierKey = (e: KeyboardEvent) => {
-      const mode = transformCopy.current;
       const { tool, onMeasure } = live.current;
       const op = st.current.op;
       const key = e.key;
-      if (key !== "Control" && key !== "Alt") {
-        if (e.type === "keydown") mode.tap = null;
+      if (key !== "Control" && key !== "Alt" && !(key === "Shift" && tool === "erase")) {
+        if (e.type === "keydown") {
+          modifierTap.current = null;
+          if (tool === "erase" && key.toLowerCase() === "e" && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && !modelingKeysBlocked(e)) {
+            eraseMode.current = "delete";
+            onMeasure("", "");
+            refreshEraserHover(e);
+          }
+        }
         return;
       }
-      const canToggle = !modelingKeysBlocked(e) && !e.metaKey && !e.shiftKey && (
-        key === "Alt" ? tool === "push" && !e.ctrlKey
-          : !e.altKey && (tool === "push" || tool === "tape" || tool === "move" || tool === "rotate")
-            && !(op?.t === "move" && op.vertex)
+      const chord = e.metaKey || (key !== "Alt" && e.altKey) ||
+        (key !== "Control" && e.ctrlKey) || (key !== "Shift" && e.shiftKey);
+      const canToggle = !modelingKeysBlocked(e) && !chord && (
+        tool === "erase" || (key === "Alt" ? tool === "push"
+          : (tool === "push" || tool === "tape" || tool === "move" || tool === "rotate")
+            && !(op?.t === "move" && op.vertex))
       );
       if (e.type === "keydown") {
-        if (!e.repeat) mode.tap = canToggle ? key : null;
+        if (!e.repeat) modifierTap.current = canToggle ? key : null;
+        if (canToggle && tool === "erase") refreshEraserHover(e);
         if (key === "Alt" && canToggle) e.preventDefault();
         return;
       }
-      const tapped = mode.tap === key;
-      mode.tap = null;
+      const tapped = modifierTap.current === key;
+      modifierTap.current = null;
       // Only a standalone modifier tap changes mode. Keyboard and pointer chords keep their actions.
-      if (!tapped || !canToggle || e.altKey || e.ctrlKey) return;
+      if (!tapped || !canToggle || e.altKey || e.ctrlKey || e.shiftKey) {
+        if (tool === "erase" && !modelingKeysBlocked(e)) refreshEraserHover(e);
+        return;
+      }
+      if (tool === "erase") {
+        const next = eraserModifier[key];
+        eraseMode.current = eraseMode.current === next ? "delete" : next;
+        if (key === "Alt") e.preventDefault();
+        onMeasure(eraserModeLabel(eraseMode.current), "");
+        refreshEraserHover(e);
+        return;
+      }
       if (key === "Alt") {
         e.preventDefault();
         return togglePushStretch();
@@ -3701,9 +3757,9 @@ export default function Viewport(props: Props) {
         cancel();
         return;
       }
-      mode.enabled = !mode.enabled;
-      if (op?.t === "move" || op?.t === "rotate") op.copy = mode.enabled;
-      const label = mode.enabled ? "Copy" : tool === "move" ? "Distance" : "Angle";
+      transformCopy.current = !transformCopy.current;
+      if (op?.t === "move" || op?.t === "rotate") op.copy = transformCopy.current;
+      const label = transformCopy.current ? "Copy" : tool === "move" ? "Distance" : "Angle";
       const value = op?.t === "move" ? fmt(op.delta.length())
         : op?.t === "rotate" && op.ref ? `${op.angle.toFixed(1)}°` : "";
       onMeasure(label, value);

@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Sheet } from "./sheet";
+import { tt } from "./i18n";
 
 interface Ask {
   title: string;
@@ -89,7 +90,7 @@ export function AskHost() {
           {a.confirm ?? "OK"}
         </button>}
         <button className="btn small ghost" onClick={() => finish(null)}>
-          Cancel
+          {tt("Cancel", "Annulla")}
         </button>
       </div>
     </Sheet>

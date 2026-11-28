@@ -200,6 +200,10 @@ export function guide(tool: Tool, c: GuideCtx): Guide {
       if (sketchUpWindowsKeys) return g("Paint Bucket", tt("Click to paint. Alt samples · Ctrl connected · Shift all · Ctrl+Shift same object.", "Fai clic per dipingere. Alt campiona · Ctrl facce connesse · Maiusc tutte · Ctrl+Maiusc stesso oggetto."), []);
       return g("Paint Bucket", "Click a face or a group to paint it with the color (or texture) on the right.", [[`${optionModifier()}+click`, "pick up a color"], ["⇧ click", "paint every matching face"]]);
     case "erase":
+      if (sketchUpWindowsKeys) return g("Eraser", tt(
+        "Click to erase. Tap a modifier to keep its mode, or hold it for a single click.",
+        "Fai clic per cancellare. Premi e rilascia un tasto per mantenere la modalità, oppure tienilo premuto durante il clic."
+      ), [["Ctrl", tt("soften", "ammorbidisci")], ["Alt", tt("unsoften", "rimuovi ammorbidimento")], ["⇧", tt("hide", "nascondi")]]);
       return g("Eraser", "Click an edge, face or group to delete it. Erasing an edge between two faces merges them.", [["⇧ click", "hide instead"], [copyKey, "soften the edge"]]);
     case "igloo":
       return g("Image Igloo", tt(

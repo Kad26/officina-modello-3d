@@ -52,7 +52,7 @@ export const TOOL_INFO: Record<Exclude<Tool, "place" | "plugin">, { name: string
   dimension: { name: "Dimension: click, click, pull out", key: sketchUpWindowsKeys ? "" : "D" },
   text: { name: "Text label: click a point, then where the label goes", key: sketchUpWindowsKeys ? "" : "W" },
   paint: { name: "Paint Bucket (⌘/Option-click samples, Shift-click paints all matching)", key: "B" },
-  erase: { name: "Eraser (Shift hides, Option/Ctrl softens, both unsoften)", key: "E" },
+  erase: { name: sketchUpWindowsKeys ? "Eraser (Shift hides, Ctrl softens, Alt unsoftens)" : "Eraser (Shift hides, Option/Ctrl softens, both unsoften)", key: "E" },
   orbit: { name: "Orbit (or middle-drag / hold Space)", key: "O" },
   pan: { name: "Pan (or Shift+middle-drag / right-drag)", key: "H" },
   zoom: { name: "Zoom (drag up/down; Shift+Z zooms extents)", key: "Z" },

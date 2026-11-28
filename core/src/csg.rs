@@ -305,14 +305,14 @@ fn build_solid_polys(m: &mut Model, id: Id, require_clean_shell: bool) -> Result
     if require_clean_shell {
         if let Some(at) = inconsistent {
             bail!(
-                "{} has inconsistently oriented faces near [{:.3}, {:.3}, {:.3}]: orient the faces before cutting",
+                "{} has inconsistently oriented faces near [{:.3}, {:.3}, {:.3}]: orient the faces and try again",
                 name_of(m, id), at.x, at.y, at.z
             );
         }
         let loose = loose_edge_samples(m, id, &uses);
         if loose.count != 0 {
             let suffix = if loose.count == 1 { "" } else { "s" };
-            bail!("{} has {} loose edge{suffix}; move or remove the loose geometry before cutting", name_of(m, id), loose.count);
+            bail!("{} has {} loose edge{suffix}; move or remove the loose geometry and try again", name_of(m, id), loose.count);
         }
     }
     drop(uses);
@@ -337,7 +337,7 @@ fn build_solid_polys(m: &mut Model, id: Id, require_clean_shell: bool) -> Result
     if require_clean_shell {
         let shells: Vec<_> = shells.into_values().collect();
         if !shells_are_oriented(&shells) {
-            bail!("{} has inward-facing faces or no enclosed volume: orient the faces before cutting", name_of(m, id));
+            bail!("{} has inward-facing faces or no enclosed volume: orient the faces and try again", name_of(m, id));
         }
         out = shells.into_iter().flatten().collect();
     }
@@ -552,7 +552,7 @@ pub fn inspect_solid(m: &Model, id: Id) -> Result<serde_json::Value> {
 
     let volume = if findings.is_empty() {
         // Material registration as part of triangulation must not touch the
-        // live model. Use the same closed-shell checks both cuts enforce.
+        // live model. Use the same closed-shell checks as the solid tools.
         match solid_info(&mut m.clone(), id) {
             Some(volume) => Some(volume),
             None => {
@@ -845,8 +845,9 @@ pub fn solid(m: &mut Model, op: &str, ids: &[Id]) -> Result<Vec<Id>> {
         bail!("pick at least two solids");
     }
     let mut polys = Vec::new();
-    for id in ids {
-        polys.push(solid_polys(m, *id)?);
+    for &id in ids {
+        check_individual_solid(m, id)?;
+        polys.push(build_solid_polys(m, id, true)?);
         if std::env::var("CSG_DEBUG").is_ok() { eprintln!("operand {id}: {} triangles", polys.last().unwrap().len()); }
     }
     let name = |m: &Model, id: Id| name_of(m, id);
@@ -899,6 +900,20 @@ pub fn solid(m: &mut Model, op: &str, ids: &[Id]) -> Result<Vec<Id>> {
     Ok(out)
 }
 
+/// Replacing an assembly with one mesh would discard children of a group or
+/// flatten the contents of a component placement.
+fn check_individual_solid(m: &Model, id: Id) -> Result<()> {
+    let nested = if let Some(def) = m.instances.get(&id).and_then(|i| m.definitions.get(&i.def)) {
+        !def.model.groups.is_empty() || !def.model.instances.is_empty()
+    } else {
+        m.groups.values().any(|g| g.parent == Some(id)) || m.instances.values().any(|i| i.parent == Some(id))
+    };
+    if nested {
+        bail!("{} contains nested objects: open it and select an individual solid", name_of(m, id));
+    }
+    Ok(())
+}
+
 /// Both cutters work on the target's shell, leaving attached hardware editable.
 /// Trim keeps the cutter and Subtract consumes it.
 fn cut(m: &mut Model, op: &str, ids: &[Id]) -> Result<Id> {
@@ -910,17 +925,10 @@ fn cut(m: &mut Model, op: &str, ids: &[Id]) -> Result<Id> {
     }
     let removed = if op == "trim" { &ids[1..] } else { ids };
     m.check_unlocked(removed)?;
-    if m.groups.values().any(|g| g.parent == Some(cutter))
-        || m.instances.values().any(|i| i.parent == Some(cutter))
-    {
-        bail!("{} contains nested objects: select a single solid as the cutter", name_of(m, cutter));
-    }
-    for id in ids {
-        if m.instances.get(id).and_then(|i| m.definitions.get(&i.def))
-            .is_some_and(|d| !d.model.groups.is_empty() || !d.model.instances.is_empty())
-        {
-            bail!("{} contains nested objects in its definition: select an individual solid", name_of(m, *id));
-        }
+    check_individual_solid(m, cutter)?;
+    // Group targets keep their attached objects on the replacement group.
+    if m.instances.contains_key(&target) {
+        check_individual_solid(m, target)?;
     }
     let cutter_polys = build_solid_polys(m, cutter, true)?;
     let target_polys = build_solid_polys(m, target, true)?;

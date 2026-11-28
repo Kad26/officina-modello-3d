@@ -140,6 +140,31 @@ fn imports_parent_and_nested_finishes_with_their_physical_texture_size() {
 }
 
 #[test]
+fn materials_share_an_archived_image_and_keep_their_own_tile_sizes() {
+    let xml = |path: &str, w: u8, h: u8| {
+        format!(r#"<mat:material hasTexture="1"><mat:texture xScale="{w}" yScale="{h}"><mat:images><mat:image id="1"
+path="{path}"/></mat:images></mat:texture></mat:material>"#).into_bytes()
+    };
+    let path = "materials/Original/wood grain.png";
+    let file = materials_skp(
+        &[(1, "Original".into()), (2, "Variant".into())],
+        &[
+            ("materials/Original/material.xml", xml("./wood grain.png", 8, 12)),
+            ("materials/Variant/material.xml", xml(path, 24, 24)),
+            (path, tiny_png()),
+        ],
+    );
+    let parsed = sketchcraft::skp::parse(&file).unwrap();
+    let original = &parsed.textures[&1];
+    let variant = parsed.textures.get(&2).expect("the variant uses the original material's image");
+    assert_eq!(original.data, variant.data);
+    assert!((original.width - 8.0 * 0.0254).abs() < 1e-10);
+    assert!((original.height - 12.0 * 0.0254).abs() < 1e-10);
+    assert!((variant.width - 24.0 * 0.0254).abs() < 1e-10);
+    assert!((variant.height - 24.0 * 0.0254).abs() < 1e-10);
+}
+
+#[test]
 fn imports_positioned_texture_in_meters_through_nested_placements() {
     use base64::Engine as _;
     use glam::DVec3;
