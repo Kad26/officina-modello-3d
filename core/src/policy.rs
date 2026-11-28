@@ -528,7 +528,8 @@ mod tests {
         let c = Caller::Mcp(ws);
         let mut ok = json!({"cmd": "export_obj", "path": "out.obj"});
         assert!(vet(&c, &mut ok).is_ok());
-        assert!(ok["path"].as_str().unwrap().ends_with("ws/out.obj"));
+        let expected = std::fs::canonicalize(base.join("ws")).unwrap().join("out.obj");
+        assert_eq!(Path::new(ok["path"].as_str().unwrap()), expected);
         for bad in [json!("../x.obj"), json!("/etc/x.obj"), json!(".hidden/x.obj"), json!("Plugins/p/main.js"), json!("sub/../../x.obj")] {
             assert!(vet(&c, &mut json!({"cmd": "export_obj", "path": bad})).is_err());
         }
